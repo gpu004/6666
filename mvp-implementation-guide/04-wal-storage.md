@@ -16,8 +16,9 @@ Goal: Implement an append only WAL with fsync and replay.
 ## Tasks
 1. Define WAL record format
    - Reuse the header from Step 03.
-   - Payload is encoded request + encoded results.
-   - Record type in header indicates `request` or `response`.
+   - Payload is encoded request (prepare) only.
+   - Reply data is not WAL-persisted; it is derived deterministically by state machine execution.
+   - Record type in header indicates `prepare`.
 
 2. WAL API design
    - `val open_file : string -> t`
@@ -36,20 +37,23 @@ Goal: Implement an append only WAL with fsync and replay.
    - Read header, then payload length.
    - Validate checksum.
    - Decode payload and pass to callback.
-   - Stop on EOF; error on partial record.
+   - Stop cleanly on EOF.
+   - Ignore trailing partial record (crash-tail tolerance).
 
 5. Add corruption handling
    - If checksum fails, stop replay and return error.
-   - If header magic is wrong, stop and return error.
+   - If header fields are invalid (size/cluster/protocol/command), stop and return error.
 
 6. Tests
    - Append N batches and replay.
    - Corrupt a byte and ensure checksum failure is detected.
+   - Re-execute replayed prepares and ensure derived responses match original execution.
 
 ## Checklists
 - [ ] WAL append writes a complete record or fails
 - [ ] Replay ignores trailing partial record
 - [ ] Checksum failure is detectable
+- [ ] WAL stores prepares only (no persisted replies)
 
 ## Notes
 TigerBeetle uses a more complex WAL for replication. The MVP uses a simpler

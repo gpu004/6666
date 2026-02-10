@@ -8,7 +8,7 @@ networking is implemented.
 - Request and response types
 - Error/result enum types
 - API contract documentation
- - Explicit field constraints that match TigerBeetle semantics
+- Explicit field constraints that match TigerBeetle semantics
 
 ## Files to create
 - `src/core/types.mli`

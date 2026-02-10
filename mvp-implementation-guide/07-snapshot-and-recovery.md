@@ -20,11 +20,16 @@ Goal: Add periodic snapshots so recovery is fast and WAL can be truncated.
      - transfers array
      - account_transfers index
      - last_timestamp
+   - **Determinism**: When iterating `Hashtbl`, the order is non-deterministic.
+     Sort entries by `id` before writing to ensure reproducible snapshots.
 
 2. Snapshot writing
    - Serialize to `snapshot.tmp`.
    - Fsync the temp file.
    - Rename to `snapshot.dat` atomically.
+   - **Durability**: Call `fsync` on the containing directory after rename.
+     On many filesystems (ext4, XFS), the directory entry update is not durable
+     until `fsync(dir_fd)`.
 
 3. Snapshot loading
    - Read and validate header checksum.
@@ -49,6 +54,8 @@ Goal: Add periodic snapshots so recovery is fast and WAL can be truncated.
 
 ## Checklists
 - [ ] Snapshot write is atomic
+- [ ] Snapshot serialization uses deterministic ordering (sorted by id)
+- [ ] Directory fsync called after snapshot rename
 - [ ] Recovery is deterministic
 - [ ] WAL rotation does not lose data
 

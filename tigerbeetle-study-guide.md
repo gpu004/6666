@@ -15,8 +15,8 @@ _Notes from reviewing the vendored TigerBeetle repository (`tigerbeetle/`) and i
 
 ## 3. Client Interface, Data Model & Requests
 - Schema is fixed to **Accounts** and **Transfers** partitioned by integer `ledger` identifiers. All numeric fields (amounts, balances) are unsigned 128-bit integers at a caller-defined asset scale. (`docs/coding/data-modeling.md`)
-- Each object exposes three `user_data` slots (128/64/32 bit) for app-specific joins into your OLGP database. (`docs/coding/data-modeling.md#user_data`)
-- **Requests** are batches of homogeneous events (max 8,189 per request/reply for most APIs). The cluster commits/rolls back an entire request atomically; events execute sequentially within the batch so later events observe earlier effects. (`docs/coding/requests.md`)
+- Each object exposes three `user_data` slots (128/64/32 bit) for app-specific joins into your OLTP database. (`docs/coding/data-modeling.md#user_data`)
+- **Requests** are batches of homogeneous events (max 8,189 per request/reply for most APIs). The cluster commits/rolls back an entire request atomically for persistence; however, individual events within a batch can succeed or fail independently unless explicitly linked with `flags.linked`. Events execute sequentially within the batch so later events observe earlier effects. (`docs/coding/requests.md`)
 - Clients should share one TigerBeetle session per process and let the client library auto-batch; there is at most one inflight request per session to simplify ordering. (`docs/coding/requests.md`)
 - **Idempotency:** The client (ideally the end-user device) must generate and persist the 128-bit `id` prior to submission. Retries reuse the same `id` and receive `ok` or `exists`. (`docs/coding/reliable-transaction-submission.md`)
 - **Time & ordering:** The cluster assigns strictly increasing ingestion timestamps and relative timeouts so that all ordering decisions live inside the primary. (`docs/coding/time.md`)

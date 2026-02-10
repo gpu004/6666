@@ -31,14 +31,18 @@ sequence, then writes the WAL atomically.
      - total events reaches limit, or
      - latency timer expires.
    - Only merge same request types.
+   - Respect TigerBeetle-style request bounds:
+     - `create_*` and `lookup_*` max 8189 events per request.
+     - query-style requests are one filter per request.
 
 4. Implement executor loop
    - For each batch:
-     - apply batch to state to get results
-     - encode request + response as WAL record
-     - append + fsync WAL
-     - if WAL ok, commit state changes
-     - if WAL error, drop changes and reply with server error
+     - compute results by running apply logic on a COPY of state (or use functional updates)
+     - encode WAL record (prepare/request only)
+     - append + fsync WAL record
+     - if WAL fsync succeeds, commit state changes and derive replies from committed execution
+     - if WAL fails, discard pending changes and reply with server error
+   - The key invariant: no state mutation is visible until after WAL durability.
 
 5. Ensure deterministic ordering
    - All apply logic runs in a single thread.
@@ -47,6 +51,7 @@ sequence, then writes the WAL atomically.
 6. Response mapping
    - Split batch results back to per request responses.
    - Preserve original request order.
+   - Query replies must preserve deterministic record ordering.
 
 ## Checklists
 - [ ] WAL append happens before state commit
@@ -56,3 +61,8 @@ sequence, then writes the WAL atomically.
 ## Notes
 The MVP should keep batching simple. This is the core throughput lever inspired
 by TigerBeetle.
+
+**Rollback Strategy**: If you apply in-place before fsync, you need a
+rollback/diff mechanism. The safer approach is to compute results on a copy or
+use functional state updates, then swap the reference atomically after WAL
+commit.
