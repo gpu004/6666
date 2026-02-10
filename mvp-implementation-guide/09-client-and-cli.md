@@ -29,7 +29,8 @@ manual testing.
    - Group requests by type.
    - Flush batch when size limit or latency expires.
    - Enforce request-size constraints:
-     - `create_*` and `lookup_*` up to 8189 events.
+     - `create_*` and `lookup_*` limits are dynamic (`batch_size_limit / event_size`),
+       negotiated at session registration.
      - query requests one filter per request.
    - Use `Eio.Time` for the latency window.
 

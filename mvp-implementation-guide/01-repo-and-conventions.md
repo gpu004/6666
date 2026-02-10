@@ -40,9 +40,12 @@ logic is written.
 3. Add dependencies (minimal set)
    - `eio`, `eio_main`
    - `cstruct` for binary layout
-   - `digestif` or `xxhash` for checksums
+   - `digestif` (MVP checksum implementation)
    - `qcheck` for property tests
    - `cmdliner` for CLI flags
+
+   Note: TigerBeetle uses AEGIS-128L for checksumming. Using `digestif` in MVP is acceptable,
+   but this is a wire/protocol divergence and must be documented wherever interoperability is discussed.
 
 4. Create dune stanzas per library
    - Example `src/core/dune`:

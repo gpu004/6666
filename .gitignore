@@ -1,1 +1,4 @@
-tigerbeetle/
+_build/
+*.install
+*.merlin
+.merlin

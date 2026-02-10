@@ -1,0 +1,4 @@
+(library
+ (name tiger_core)
+ (public_name tigerocaml.core)
+ (libraries))

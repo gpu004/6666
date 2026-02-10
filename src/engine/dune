@@ -1,0 +1,4 @@
+(library
+ (name tiger_engine)
+ (public_name tigerocaml.engine)
+ (libraries tiger_core tiger_codec tiger_storage eio))

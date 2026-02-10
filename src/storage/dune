@@ -1,0 +1,4 @@
+(library
+ (name tiger_storage)
+ (public_name tigerocaml.storage)
+ (libraries tiger_core tiger_codec cstruct))

@@ -1,0 +1,4 @@
+(library
+ (name tiger_client)
+ (public_name tigerocaml.client)
+ (libraries tiger_core tiger_codec eio))

@@ -22,20 +22,33 @@ Goal: Define a stable encoding for WAL records and network requests.
    - No strings in MVP payloads (all integers).
    - Use `Cstruct` to write and read.
 
-2. Define message header layout (TigerBeetle-aligned, 256 bytes)
-   - Header checksum covering the rest of the header.
-   - Body checksum covering the payload.
-   - Cluster id, size, protocol version, command enum.
-   - Reserved fields must be zeroed.
+2. Define message header layout (TigerBeetle-compatible shape, 256 bytes)
+   - If wire compatibility is required, match TigerBeetle header fields exactly:
+     - `checksum: u128`
+     - `checksum_padding: u128`
+     - `checksum_body: u128`
+     - `checksum_body_padding: u128`
+     - `nonce_reserved: u128`
+     - `cluster: u128`
+     - `size: u32`
+     - `epoch: u32`
+     - `view: u32`
+     - `release: u32`
+     - `protocol: u16`
+     - `command: u8`
+     - `replica: u8`
+     - `reserved_frame: 12 bytes`
+     - `reserved_command: 128 bytes`
+   - Reserved/padding fields must be zeroed unless explicitly defined by command schema.
    - Total `size` is header + payload.
    - Enforce `message_size_max` and reject oversized frames.
 
 3. Define payload encoding
-   - Each request type starts with a count `u32` followed by fixed size records.
-   - Example for account:
-     - id (u128), ledger (u32), code (u16), flags (u16), user_data_128 (u128), user_data_64 (u64), user_data_32 (u32)
-   - Include `reserved` and `timestamp` fields to match TigerBeetle’s structs.
-   - Responses include count + result codes; for lookup and query, append full records for found entries.
+   - For TigerBeetle-compatible framing, encode payload as packed fixed-size records (no mandatory leading count field).
+   - Event count is derived from `(header.size - 256) / event_size` for single-batch messages.
+   - Keep struct field order byte-exact (`Account`, `Transfer`, filters, and results).
+   - Create results are sparse records: `{ index: u32; result: u32 }`, only for failed events.
+   - If MVP introduces simplified framing (e.g. explicit count), document it as a protocol divergence.
 
 4. Implement codecs
    - `encode_request : request -> Cstruct.t`
@@ -46,6 +59,7 @@ Goal: Define a stable encoding for WAL records and network requests.
 5. Checksum integration
    - `checksum payload` in encoder and store in header.
    - Validate checksum before decoding.
+   - TigerBeetle uses AEGIS-128L MAC-as-checksum; using another algorithm is an intentional MVP divergence.
 
 6. Round trip tests
    - Use QCheck to generate random requests.
@@ -60,3 +74,6 @@ Goal: Define a stable encoding for WAL records and network requests.
 ## Notes
 This step mirrors TigerBeetle's strict layout control. The MVP does not need
 schema evolution yet, but versioning should be built in from the start.
+
+TigerBeetle clients and replicas also use multi-batch request/reply encoding with trailer metadata.
+The MVP may skip this initially, but must document that limitation clearly.

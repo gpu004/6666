@@ -58,3 +58,6 @@ Goal: Implement an append only WAL with fsync and replay.
 ## Notes
 TigerBeetle uses a more complex WAL for replication. The MVP uses a simpler
 append only log but keeps the same strict validation idea.
+
+TigerBeetle also pre-allocates WAL zones and uses direct-I/O-oriented storage layout rather than a
+simple `O_APPEND` growth model. Keep this as an explicit MVP divergence.
