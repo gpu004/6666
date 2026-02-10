@@ -1,112 +1,100 @@
-# TigerOCaml API Reference
+# TigerOCaml API Contract (Step 02)
 
-## Data Model
+## Operation Surface
 
-### Account (128 bytes on wire)
+Batchable operations:
+- `create_accounts`
+- `create_transfers`
+- `lookup_accounts`
+- `lookup_transfers`
 
-| Field | Type | Constraint |
-|-------|------|-----------|
-| `id` | uint128 | Must not be `0` or `2^128 - 1` |
-| `debits_pending` | uint128 | Must be `0` on create |
-| `debits_posted` | uint128 | Must be `0` on create |
-| `credits_pending` | uint128 | Must be `0` on create |
-| `credits_posted` | uint128 | Must be `0` on create |
-| `user_data_128` | uint128 | Application-defined |
-| `user_data_64` | uint64 | Application-defined |
-| `user_data_32` | uint32 | Application-defined |
-| `reserved` | int | Must be `0` |
-| `ledger` | uint32 | Must not be `0` |
-| `code` | uint16 | Must not be `0` |
-| `flags` | uint16 | See account flags below |
-| `timestamp` | uint64 | Assigned by cluster; must be `0` unless `flags.imported` |
+Single-filter operations (one filter per request):
+- `get_account_transfers`
+- `get_account_balances`
+- `query_accounts`
+- `query_transfers`
+- `get_change_events`
 
-Field order is binary-layout critical and must match TigerBeetle exactly.
+## Batch Size Limits
 
-### Transfer (128 bytes on wire)
+Batch limits are dynamic and derived from:
+- `batch_size_limit / event_size`
 
-| Field | Type | Constraint |
-|-------|------|-----------|
-| `id` | uint128 | Must not be `0` or `2^128 - 1` |
-| `debit_account_id` | uint128 | Must exist |
-| `credit_account_id` | uint128 | Must exist, must differ from debit |
-| `amount` | uint128 | Must not be `0` (unless posting/voiding pending) |
-| `pending_id` | uint128 | `0` unless posting/voiding a pending transfer |
-| `user_data_128` | uint128 | Application-defined |
-| `user_data_64` | uint64 | Application-defined |
-| `user_data_32` | uint32 | Application-defined |
-| `timeout` | uint32 | Reserved for pending transfers only |
-| `ledger` | uint32 | Must match both accounts |
-| `code` | uint16 | Must not be `0` |
-| `flags` | uint16 | See transfer flags below |
-| `timestamp` | uint64 | Assigned by cluster |
+`batch_size_limit` is negotiated at session registration.
+With default `message_size_max = 1 MiB`, the limit is based on payload size plus the 256-byte header budget.
 
-Field order is binary-layout critical and must match TigerBeetle exactly.
+## Core Invariants
 
-## Account Flags
+ID rules (`account_id`, `transfer_id`, and all ID-like fields):
+- Must not be `0`.
+- Must not be `2^128 - 1`.
 
-| Bit | Name | Description |
-|-----|------|-------------|
-| 0 | `linked` | Atomic chain — this event succeeds/fails with the next |
-| 1 | `debits_must_not_exceed_credits` | Balance constraint |
-| 2 | `credits_must_not_exceed_debits` | Balance constraint |
-| 3 | `history` | Enable balance history queries |
-| 4 | `imported` | Caller provides timestamp |
-| 5 | `closed` | Account is closed; requires a balance constraint flag |
+Ledger/code rules:
+- `ledger` must not be `0`.
+- `code` must not be `0`.
 
-`debits_must_not_exceed_credits` and `credits_must_not_exceed_debits` are mutually exclusive.
+Flag and padding rules:
+- Bitfield padding bits must be zero.
+- `account_flags.debits_must_not_exceed_credits` and `account_flags.credits_must_not_exceed_debits` are mutually exclusive.
+- `transfer_flags.pending`, `transfer_flags.post_pending_transfer`, and `transfer_flags.void_pending_transfer` are mutually exclusive.
+- `transfer_flags.balancing_debit` and `transfer_flags.balancing_credit` are mutually exclusive.
 
-## Transfer Flags
+Wire layout rules:
+- Field order is layout-critical for all wire records.
+- `account` and `transfer` are each 128 bytes.
+- `account_balance` is 128 bytes.
+- `account_filter` is 128 bytes.
+- `query_filter` is 64 bytes.
+- `change_event` is 384 bytes.
+- `change_events_filter` is 64 bytes.
 
-| Bit | Name | Description |
-|-----|------|-------------|
-| 0 | `linked` | Atomic chain |
-| 1 | `pending` | Two-phase: reserve funds |
-| 2 | `post_pending_transfer` | Resolve pending: commit |
-| 3 | `void_pending_transfer` | Resolve pending: rollback |
-| 4 | `balancing_debit` | Clamp amount to available debit balance |
-| 5 | `balancing_credit` | Clamp amount to available credit balance |
-| 6 | `closing_debit` | Close debit account after transfer |
-| 7 | `closing_credit` | Close credit account after transfer |
-| 8 | `imported` | Caller provides timestamp |
+## Create Results: Sparse Encoding
 
-`pending`, `post_pending_transfer`, and `void_pending_transfer` are mutually exclusive.
+Create operations return sparse result items:
+- `create_accounts_result = { index: u32; result: create_account_result }`
+- `create_transfers_result = { index: u32; result: create_transfer_result }`
 
-## Request Types
+Behavior:
+- Only failed events appear in the result list.
+- A fully successful batch returns an empty list.
+- `index` points to the failed event position within the submitted batch.
 
-| Command | Batch limit | Description |
-|---------|------------|-------------|
-| `create_accounts` | dynamic (`batch_size_limit / 128`) | Create accounts atomically per batch |
-| `create_transfers` | dynamic (`batch_size_limit / 128`) | Create transfers atomically per batch |
-| `lookup_accounts` | dynamic (`batch_size_limit / 16`) | Lookup accounts by id |
-| `lookup_transfers` | dynamic (`batch_size_limit / 16`) | Lookup transfers by id |
-| `get_account_transfers` | 1 filter/request; dynamic reply capacity | Query transfers for an account |
-| `get_account_balances` | 1 filter/request; dynamic reply capacity | Query balance snapshots for an account |
-| `query_accounts` | 1 filter/request; dynamic reply capacity | Query accounts by filter |
-| `query_transfers` | 1 filter/request; dynamic reply capacity | Query transfers by filter |
-| `get_change_events` | 1 filter/request; dynamic reply capacity | Query change-event stream |
+## Idempotency and Exists Semantics
 
-`batch_size_limit` is negotiated at client session registration. With default
-`message_size_max = 1 MiB`, common limits are close to (but not universally) 8189 events.
+Clients own idempotency keys (`id`):
+- Client generates and persists IDs before submission.
+- Retries reuse the same ID.
 
-## Create Result Encoding
+Outcomes:
+- Same ID + same payload semantics -> `Exists` (idempotent success).
+- Same ID + different payload fields -> `Exists_with_different_*` result.
 
-- `create_accounts` and `create_transfers` replies are sparse.
-- Each item is `{ index: uint32, result: uint32 }`.
-- Only failed events produce a result item.
-- A fully successful create batch returns an empty result list.
+## Timestamp Ownership and Imported Semantics
 
-## Idempotency
+Normal events:
+- Cluster owns timestamp assignment.
+- For non-imported events, timestamp must be zero on input.
 
-- The **client** must generate and persist the 128-bit `id` before submission.
-- Retries reuse the same `id`.
-- If the id already exists with identical fields → `Exists` (success).
-- If the id exists with different fields → `Exists_with_different_*` (error).
+Imported events (`flags.imported = true`):
+- Caller supplies timestamp.
+- Imported timestamps must satisfy ordering/range constraints represented by imported-event result codes.
 
-## Linked Events
+## Linked Event Chains
 
-Events with `flags.linked` are chained. If any event in the chain fails, all events in the chain fail with `Linked_event_failed`. The last event in the chain does **not** set the `linked` flag.
+`flags.linked` marks atomic chain membership.
+If one linked event fails, the chain fails consistently and returns linked-event result codes (`Linked_event_failed` / chain-open semantics).
 
-## Timestamp Ownership
+## Error Code Mapping
 
-- The cluster assigns strictly increasing timestamps.
-- Events with `flags.imported` must provide their own timestamp (must be > 0, strictly increasing).
+Create account and create transfer result enums map to stable `u32` codes matching TigerBeetle semantics exactly.
+
+Notable points:
+- `create_account_result`: codes `0..26`.
+- `create_transfer_result`: codes `0..68` (including `Deprecated_18`).
+
+## Filter Semantics
+
+For `account_filter` and `query_filter`:
+- Zero-valued filter fields mean "no filter" for that field.
+- `limit` controls maximum returned results.
+- `reversed` flags request reverse chronological ordering.
