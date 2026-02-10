@@ -1,5 +1,26 @@
 # Architecture Decisions
 
+## ADR-000: Build Environment and Package Manager
+
+**Status:** Accepted
+
+**Decision:** Use **opam** as the primary package manager and environment manager
+for development and CI.
+
+**Rationale:**
+- Dune projects integrate cleanly with opam metadata generated from
+  `dune-project`
+- Widely adopted across the OCaml ecosystem and easy to reproduce in CI
+- Minimal setup for contributors compared to maintaining a separate nix flake
+
+**Consequences:**
+- Contributors should install dependencies with opam switches
+- A nix development environment is out of scope for MVP
+- Formatting is pinned via `.ocamlformat` (rather than a dune extension stanza)
+  for compatibility with the current dune toolchain
+
+---
+
 ## ADR-001: Networking Runtime — Eio
 
 **Status:** Accepted

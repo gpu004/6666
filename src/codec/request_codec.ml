@@ -8,8 +8,6 @@ open Tiger_core.Requests
 let account_wire_size = 128
 let transfer_wire_size = 128
 let id_wire_size = 16
-let account_filter_wire_size = 36
-let query_filter_wire_size = 56
 
 (* --- uint128 helpers ----------------------------------------------------- *)
 

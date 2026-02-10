@@ -1,6 +1,5 @@
 (** Binary encoding/decoding for request payloads. *)
 
-open Tiger_core.Types
 open Tiger_core.Requests
 
 val encode_request : request -> Cstruct.t
