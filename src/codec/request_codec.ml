@@ -249,7 +249,7 @@ let decode_id_list buf =
     in
     aux [] (n - 1)
 
-let encode_request (req : request) : Cstruct.t =
+let encode_payload (req : request) : Cstruct.t =
   match req with
   | Create_accounts accounts -> encode_list accounts account_wire_size encode_account
   | Create_transfers transfers ->
@@ -282,7 +282,7 @@ let encode_request (req : request) : Cstruct.t =
     encode_change_events_filter buf 0 f;
     buf
 
-let decode_request (cmd : command) (buf : Cstruct.t) : (request, string) result =
+let decode_payload (cmd : command) (buf : Cstruct.t) : (request, string) result =
   match cmd with
   | Cmd_create_accounts ->
     (match decode_list buf account_wire_size decode_account with
@@ -332,3 +332,38 @@ let decode_request (cmd : command) (buf : Cstruct.t) : (request, string) result 
     if Cstruct.length buf <> change_events_filter_wire_size then
       Error "invalid change_events_filter size"
     else Ok (Get_change_events (decode_change_events_filter buf 0))
+
+let encode_request (req : request) : Cstruct.t =
+  let payload = encode_payload req in
+  let command = request_command req in
+  let header =
+    Header.encode
+      {
+        Header.cluster = u128_zero;
+        epoch = 0l;
+        view = 0l;
+        release = 0l;
+        protocol = 1;
+        command;
+        replica = 0;
+        body_size = Cstruct.length payload;
+      }
+      ~body:payload
+  in
+  Cstruct.append header payload
+
+let decode_request (frame : Cstruct.t) : (request, string) result =
+  if Cstruct.length frame < Header.header_size then Error "frame too short"
+  else
+    let header_buf = Cstruct.sub frame 0 Header.header_size in
+    match Header.decode header_buf with
+    | Error e -> Error e
+    | Ok header ->
+      let expected_total = Header.header_size + header.body_size in
+      if Cstruct.length frame <> expected_total then
+        Error "frame size does not match header size field"
+      else
+        let payload = Cstruct.sub frame Header.header_size header.body_size in
+        if not (Header.validate_body ~header_buf ~body:payload) then
+          Error "body checksum mismatch"
+        else decode_payload header.command payload

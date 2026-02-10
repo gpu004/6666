@@ -2,12 +2,18 @@
 
 open Tiger_core.Requests
 
-val encode_request : request -> Cstruct.t
-(** Encode a request into a binary payload (without header). *)
+val encode_payload : request -> Cstruct.t
+(** Encode a request payload (without header). *)
 
-val decode_request :
+val decode_payload :
   command -> Cstruct.t -> (request, string) result
-(** Decode a binary payload into a request given the command from the header. *)
+(** Decode a request payload given the command from the header. *)
+
+val encode_request : request -> Cstruct.t
+(** Encode a full request frame (header + payload). *)
+
+val decode_request : Cstruct.t -> (request, string) result
+(** Decode and validate a full request frame (header + payload). *)
 
 (** {1 Wire sizes} *)
 

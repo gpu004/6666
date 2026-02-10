@@ -1,22 +1,7 @@
-(** Message header for TigerOCaml wire format.
+(** TigerBeetle-aligned 256-byte message header.
 
-    The header is a fixed 256-byte structure at the front of every message.
-    Layout (little-endian):
-
-    {v
-    Offset  Size  Field
-    ------  ----  -----
-      0      32   header_checksum  (SHA-256 over bytes 32..255)
-     32      32   body_checksum    (SHA-256 over the payload)
-     64       4   cluster_id       (uint32)
-     68       4   size             (uint32, total message = header + body)
-     72       2   protocol_version (uint16)
-     74       2   command          (uint16, see Requests.command)
-     76       4   reserved_1       (must be 0)
-     80     176   reserved_pad     (must be all zeros)
-    v}
-
-    Total: 256 bytes. *)
+    All fields are little-endian and fixed-width. Reserved/padding fields are
+    zero unless explicitly defined by a command schema. *)
 
 val header_size : int
 (** Always 256. *)
@@ -25,8 +10,13 @@ val message_size_max : int
 (** Maximum total message size (header + body). *)
 
 type t = {
-  cluster_id : int32;
+  cluster : Tiger_core.Types.u128;
+  epoch : int32;
+  view : int32;
+  release : int32;
+  protocol : int;
   command : Tiger_core.Requests.command;
+  replica : int;
   body_size : int;
 }
 (** Decoded header. [body_size] = total size - header_size. *)
