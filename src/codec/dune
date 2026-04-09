@@ -1,4 +1,0 @@
-(library
- (name tiger_codec)
- (public_name tigerocaml.codec)
- (libraries tiger_core cstruct digestif))

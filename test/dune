@@ -1,3 +1,0 @@
-(tests
- (names smoke_test types_test)
- (libraries tiger_core alcotest))

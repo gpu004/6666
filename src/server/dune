@@ -1,4 +1,0 @@
-(library
- (name tiger_server)
- (public_name tigerocaml.server)
- (libraries tiger_core tiger_codec tiger_engine eio))
