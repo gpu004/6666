@@ -1,0 +1,24 @@
+#!/bin/zsh
+set -euo pipefail
+
+ROOT="${0:A:h}"
+TOOLS_DIR="$ROOT/_build_tools"
+CHECKSUM_SRC="$ROOT/../repo/src/ocaml_tb_checksum.zig"
+CHECKSUM_BIN="$TOOLS_DIR/tb_checksum"
+MAIN_BIN="$ROOT/_build/default/bin/tigerbeetle.exe"
+
+mkdir -p "$TOOLS_DIR"
+
+if [[ "${1:-}" != "format" && "${1:-}" != "version" ]]; then
+  if [[ ! -x "$CHECKSUM_BIN" || "$CHECKSUM_SRC" -nt "$CHECKSUM_BIN" ]]; then
+    zig build --build-file "$ROOT/checksum_build.zig" -Doptimize=ReleaseFast --prefix "$TOOLS_DIR" >/dev/null
+    cp "$TOOLS_DIR/bin/tb_checksum" "$CHECKSUM_BIN"
+  fi
+fi
+
+if [[ ! -x "$MAIN_BIN" ]]; then
+  dune build ./bin/tigerbeetle.exe
+fi
+
+export TB_OCAML_CHECKSUM_BIN="$CHECKSUM_BIN"
+exec "$MAIN_BIN" "$@"

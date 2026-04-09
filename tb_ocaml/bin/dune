@@ -1,0 +1,3 @@
+(executable
+ (name tigerbeetle)
+ (libraries tb_ocaml unix threads yojson))

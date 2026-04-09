@@ -1,0 +1,4 @@
+(library
+ (name tb_ocaml)
+ (wrapped false)
+ (libraries unix threads yojson))
