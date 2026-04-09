@@ -1,3 +1,8 @@
+(** Binary codecs for the compatibility protocol.
+
+    This module is the boundary between typed OCaml values and the raw
+    wire-format used by the prototype client/server surface. *)
+
 open Types
 
 type request_header = {
@@ -35,12 +40,31 @@ val encode_account_balance : account_balance -> bytes
 val encode_account_filter : account_filter -> bytes
 val encode_query_filter : query_filter -> bytes
 val encode_create_results : create_result list -> bytes
+
+(** Encode only non-success account creation results into the sparse error
+    format used by older clients.
+
+    Example:
+
+    {[
+      let body =
+        Codec.encode_create_account_errors
+          [
+            { Types.timestamp = 1L; status = Types.create_account_created };
+            { Types.timestamp = 2L; status = Types.create_account_exists };
+          ]
+    ]}
+
+    This mirrors the assertion in [tests/unit_tests.ml]. *)
+
 val encode_create_account_errors : create_result list -> bytes
 val encode_create_transfer_errors : create_result list -> bytes
 val encode_accounts : account list -> bytes
 val encode_transfers : transfer list -> bytes
 val encode_balances : account_balance list -> bytes
 val encode_register_result : unit -> bytes
+
+(** Construct a full reply message, including header checksums. *)
 
 val make_reply :
   request_header:request_header ->

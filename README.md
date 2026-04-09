@@ -1,44 +1,44 @@
 # TigerBeetle in OCaml
 
-This repository is a prototype-grade OCaml recreation inspired by TigerBeetle, with the upstream Zig TigerBeetle repository kept here as the reference implementation.
+This repository contains a prototype-grade OCaml compatibility build inspired by
+TigerBeetle, with the upstream Zig codebase kept in `repo/` as the reference.
 
-This project does not attempt to reimplement the whole TigerBeetle system. It only builds partial functionality, compares selected components against the upstream project, and uses those focused comparisons to guide the OCaml prototype.
+This is not a full reimplementation. Treat it as a behavior and tooling spike:
 
-## Prototype scope
-
-- This repository is a prototype only.
-- The OCaml code implements partial functionality rather than the full TigerBeetle feature set.
-- The work here compares specific parts of the upstream project, not the entire system end to end.
-- The current focus is on selected CLI, server, protocol, state, testing, and benchmark surfaces that are practical to reproduce and evaluate in OCaml.
-
-The OCaml workflow is Dune-first:
-
-```sh
-dune build
-dune test
-dune runtest
-```
+- core ledger API only
+- server + CLI compatibility surface
+- partial blackbox compatibility
+- useful for focused experiments, not production claims
 
 ## Repository layout
 
-- `tb_ocaml/`: the OCaml implementation.
-- `repo/`: the upstream TigerBeetle repository as a submodule.
-- `zig/`: the local Zig `0.14.1` toolchain used by the upstream repo.
-- `benchmarks/`: local comparison benchmarks.
-- `scripts/`: older helper scripts. Prefer the Dune aliases in `tb_ocaml/`.
+- `tb_ocaml/`: OCaml implementation
+- `repo/`: upstream TigerBeetle submodule
+- `benchmarks/`: local comparison harnesses
+- `scripts/`: helper scripts outside Dune
+- `zig/`: local Zig toolchain used for some upstream/build helper tasks
 
-## Clone correctly
+## Clone
 
-Because `repo/` is a submodule, a fresh clone needs one of these:
+The upstream reference is a submodule:
 
 ```sh
 git clone --recurse-submodules https://github.com/tusharhqq/6666.git
 ```
 
-or, after cloning:
+or after cloning:
 
 ```sh
 git submodule update --init --recursive
+```
+
+## Portable shell setup
+
+Commands below assume:
+
+```sh
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
 ```
 
 ## Requirements
@@ -46,238 +46,197 @@ git submodule update --init --recursive
 - OCaml `5.4+`
 - Dune `3.21+`
 - Python `3`
-- For the upstream Python blackbox alias: a Python virtualenv at `.venv_pytests` with `pytest` and `tigerbeetle` installed
-- For server-starting commands: a checksum helper at `tb_ocaml/_build_tools/tb_checksum`
+- a Python virtualenv at `$ROOT/.venv_pytests` for the upstream Python blackbox
+- a checksum helper at `$ROOT/tb_ocaml/_build_tools/tb_checksum`
 
-Set up the upstream Python test environment once:
+Set up the Python env once:
 
 ```sh
-cd /Users/blouse_man/Downloads/coding/github/6666
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
 python3 -m venv .venv_pytests
 . .venv_pytests/bin/activate
 pip install -U pip pytest tigerbeetle
 ```
 
-## Build the OCaml version
+## Dune workflow
 
 ```sh
-cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT/tb_ocaml"
 dune build
+dune test
+dune runtest
+dune build @doc
 ```
 
-## Formatting
+Supporting tools used here:
 
-Formatting is enforced with `ocamlformat` and a project-local config at:
+- `Dune` for build, test, docs, and cram orchestration
+- `Alcotest` for deterministic unit tests
+- `QCheck` for property tests
+- `bisect_ppx` for coverage
+- `ocamlformat` for formatting
+- `ppx_inline_test` when the local switch can support it
+- optional `junit_alcotest` if CI needs JUnit XML
 
-- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/.ocamlformat`
+## Formatting and warnings
 
-Local commands:
+Formatting is pinned by `tb_ocaml/.ocamlformat`.
 
 ```sh
-cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT/tb_ocaml"
 ocamlformat --check $(find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print)
 ocamlformat -i $(find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print)
 ```
 
-The baseline CI workflow runs the exact same core checks every time in:
-
-- `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_ci.yml`
-
-The sequence is:
-
-```sh
-opam install . --deps-only --with-test
-dune build
-dune runtest
-ocamlformat --check $(find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print)
-```
-
-## Warnings
-
-Compiler warnings are strict by default in:
-
-- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/dune`
-
-The project now builds with:
+Warnings are strict in `tb_ocaml/dune`:
 
 - `-w +A-41-42-70`
 - `-warn-error +A-41-42-70`
 
-That means warnings fail the build, with these narrow exceptions:
+## CI baseline
 
-- warning `70` is excluded so the project does not force placeholder `.mli` files for every module
-- warnings `41` and `42` are excluded because they are about record-label disambiguation and compatibility with very old OCaml syntax, not current correctness in this OCaml `5.4` codebase
+The main OCaml CI workflow is `.github/workflows/tb_ocaml_ci.yml`. It runs:
 
-This keeps warning noise near zero while still treating unused values, non-exhaustive matches, fragile pattern matches, and similar issues as CI-breaking problems.
+```sh
+opam install . --deps-only --with-test --with-doc
+dune build
+dune build @doc
+dune runtest
+ocamlformat --check $(find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print)
+```
 
-CI enforcement is in:
+## Interfaces and docs
 
-- `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_ci.yml`
+Every public library module now has an `.mli`:
 
-## Interfaces
+- `tb_ocaml/lib/u128.mli`
+- `tb_ocaml/lib/types.mli`
+- `tb_ocaml/lib/multibatch.mli`
+- `tb_ocaml/lib/codec.mli`
+- `tb_ocaml/lib/state.mli`
+- `tb_ocaml/lib/checksum.mli`
+- `tb_ocaml/lib/repl.mli`
+- `tb_ocaml/lib/server.mli`
 
-Important library modules now have explicit `.mli` files:
+Docs are generated from the same Dune package:
 
-- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/u128.mli`
-- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/types.mli`
-- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/multibatch.mli`
-- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/codec.mli`
-- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/state.mli`
+```sh
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT/tb_ocaml"
+dune build @doc
+```
 
-The biggest quality change is that `U128.t` and `State.t` are now abstract to callers. That stops accidental construction or mutation of internal state from the rest of the codebase and keeps the effectful server layer from reaching through state representation details.
+Generated HTML:
+
+- `tb_ocaml/_build/default/_doc/_html/`
+
+The package landing page is `tb_ocaml/tb_ocaml.mld`.
 
 ## Run the OCaml version
 
-Use Dune to run the built executable:
-
 ```sh
-cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT/tb_ocaml"
 dune exec ./bin/tigerbeetle.exe -- version
-TB_OCAML_CHECKSUM_BIN=/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/_build_tools/tb_checksum \
+TB_OCAML_CHECKSUM_BIN="$ROOT/tb_ocaml/_build_tools/tb_checksum" \
   dune exec ./bin/tigerbeetle.exe -- format --cluster=0 --replica=0 --replica-count=1 --development /tmp/0_0.tigerbeetle
-TB_OCAML_CHECKSUM_BIN=/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/_build_tools/tb_checksum \
+TB_OCAML_CHECKSUM_BIN="$ROOT/tb_ocaml/_build_tools/tb_checksum" \
   dune exec ./bin/tigerbeetle.exe -- start --development=true --addresses=0 /tmp/0_0.tigerbeetle
 ```
 
-The `start` command prints the chosen TCP port on stdout. In another shell, use `repl` against that port:
+Then in another shell:
 
 ```sh
-cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
-TB_OCAML_CHECKSUM_BIN=/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/_build_tools/tb_checksum \
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT/tb_ocaml"
+TB_OCAML_CHECKSUM_BIN="$ROOT/tb_ocaml/_build_tools/tb_checksum" \
   dune exec ./bin/tigerbeetle.exe -- repl --cluster=0 --addresses=<port> --command="create_accounts id=17 code=718 ledger=1"
-TB_OCAML_CHECKSUM_BIN=/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/_build_tools/tb_checksum \
+TB_OCAML_CHECKSUM_BIN="$ROOT/tb_ocaml/_build_tools/tb_checksum" \
   dune exec ./bin/tigerbeetle.exe -- repl --cluster=0 --addresses=<port> --command="lookup_accounts id=17"
 ```
 
-## Run tests against the OCaml version
+## Tests
 
-### Test categories
+Main test layers:
 
-- Unit tests: Alcotest executable at `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/tests/unit_tests.ml`
-- Property tests: QCheck executable at `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/tests/property_tests.ml`
-- Cram / CLI tests: Dune cram file at `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/tests/cli.t`
-- Blackbox smoke test: repo-local Python harness at `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/tests/core_blackbox.py`
+- `tb_ocaml/tests/unit_tests.ml`: Alcotest unit tests
+- `tb_ocaml/tests/property_tests.ml`: QCheck property tests
+- `tb_ocaml/tests/cli.t`: cram CLI tests
+- `tb_ocaml/tests/core_blackbox.py`: repo-local compatibility smoke test
 
-### Dune test aliases
+The unit suite currently covers:
+
+- codec and multibatch round-trips
+- status/flag rendering in `Types`
+- REPL parsing in `Repl`
+- basic create/lookup/query behavior in `State`
+
+Run them with Dune:
 
 ```sh
-cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT/tb_ocaml"
 dune test
-```
-
-`dune test` runs the OCaml-native deterministic suites:
-
-- Alcotest unit tests
-- QCheck property tests
-
-Run the full Dune `@runtest` alias:
-
-```sh
-cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
 dune runtest
 ```
 
-`dune runtest` runs everything above plus:
+The cram layer checks real CLI behavior:
 
-- the cram CLI test in `tb_ocaml/tests/cli.t`
-- the repo-local compatibility harness in `tb_ocaml/tests/core_blackbox.py`
+- `--help`
+- `inspect --help`
+- `version`
+- `version --verbose`
+- `format`
+- unsupported `inspect` subcommands
 
-As of April 9, 2026, both `dune test` and `dune runtest` pass in this workspace.
+## Upstream Python blackbox against OCaml
 
-Because `dune runtest` includes the cram test in `tb_ocaml/tests/cli.t`, the baseline CI job also exercises the user-facing CLI surface instead of only the pure OCaml test executables.
-
-### Run the upstream Python blackbox file against the OCaml server
-
-The upstream blackbox file is:
-
-- `/Users/blouse_man/Downloads/coding/github/6666/repo/src/clients/python/tests/test_basic.py`
-
-Use the Dune alias:
+This runs the original upstream Python test file from `repo/` against the OCaml
+server:
 
 ```sh
-cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT/tb_ocaml"
 dune build @upstream-python-blackbox
 ```
 
-This alias starts the OCaml server, exports `TB_ADDRESS`, copies the upstream Python test to a temp directory, and runs it with `pytest` from `/Users/blouse_man/Downloads/coding/github/6666/.venv_pytests`.
-
-As of April 9, 2026, this command runs the original upstream Python blackbox file successfully against the OCaml server, but the test suite fails at `test_create_accounts` because the OCaml server still returns `[]` where that upstream client path expects one `CreateAccountResult`.
-
-### Inline tests status
-
-Inline tests are not wired yet in this switch. The concrete blocker is `ppx_inline_test`: both
-
-```sh
-opam install -y ppx_inline_test
-opam install -y -j1 ppx_inline_test
-```
-
-failed on this machine with `signal 7` while building transitive dependencies `ppx_derivers`, `ocaml-compiler-libs`, and `jane-street-headers`. So the repository is now split into unit, property, cram, and blackbox layers under Dune, but the inline-test layer is documented as blocked by the current opam environment rather than partially enabled.
+Current status: it still fails at upstream `test_create_accounts`. That means
+the project is not yet a trusted compatibility layer.
 
 ## Coverage
 
-Coverage support is wired into the OCaml Dune stanzas with `bisect_ppx` instrumentation on:
+Coverage is wired through `bisect_ppx`, but in this local switch the available
+`bisect_ppx` conflicts with OCaml `5.4.0`. The authoritative path is CI in
+`.github/workflows/tb_ocaml_coverage.yml`.
 
-- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/dune`
-- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/bin/dune`
+When coverage is available, treat it as a blind-spot finder, not a percentage
+goal. Prioritize:
 
-The intended coverage commands are:
+- `tb_ocaml/lib/state.ml`
+- `tb_ocaml/lib/codec.ml`
+- `tb_ocaml/lib/multibatch.ml`
 
-```sh
-cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
-BISECT_SILENT=YES dune runtest --instrument-with bisect_ppx --force
-bisect-ppx-report summary
-bisect-ppx-report html
-```
+## Benchmarking caveat
 
-That produces the HTML report in `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/_coverage/index.html`.
+`benchmarks/compare_server_cli.py` is useful for comparing the current
+prototype workflow, not normalized engine throughput.
 
-Current local blocker:
+The current OCaml implementation still contains prototype scaffolding that
+materially affects benchmark results:
 
-- the current developer switch is OCaml `5.4.0`
-- `opam show bisect_ppx` currently resolves to `2.8.3`
-- that package depends on `ppxlib < 0.36.0`
-- on this machine that conflicts with OCaml `5.4.0`, so `opam install bisect_ppx` does not solve in the current switch
+- `tb_ocaml/lib/checksum.ml` shells out to an external checksum helper per call
+- `tb_ocaml/lib/server.ml` serializes stateful work behind one mutex
+- `tb_ocaml/lib/state.ml` persists snapshots with `Marshal`
 
-Because of that, the repository now checks coverage in CI instead of pretending local coverage works on this switch. The workflow is:
+Treat benchmark output as "how this spike behaves today", not "how an OCaml
+TigerBeetle would perform after architectural cleanup."
 
-- `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_coverage.yml`
+## Current limits
 
-That job runs coverage on OCaml `5.3.0`, generates both the terminal summary and the HTML report, and uploads the report as an artifact.
-
-Use coverage to find untested branches in core logic such as:
-
-- request/reply codec paths in `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/codec.ml`
-- multibatch edge cases in `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/multibatch.ml`
-- validation and ledger state transitions in `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/state.ml`
-
-The target is not fake `100%`. The useful bar is high coverage on core library logic, with lower expectations on CLI glue, wrappers, and mechanical entrypoints.
-
-### Benchmark OCaml vs Zig on the shared CLI/server surface
-
-```sh
-cd /Users/blouse_man/Downloads/coding/github/6666
-python3 benchmarks/compare_server_cli.py --accounts 1000 --batch-size 200 --iterations 3
-```
-
-## Original upstream blackbox tests
-
-The upstream blackbox-style tests in `repo/` are:
-
-- `/Users/blouse_man/Downloads/coding/github/6666/repo/src/integration_tests.zig`
-- `/Users/blouse_man/Downloads/coding/github/6666/repo/src/clients/python/tests/test_basic.py`
-- `/Users/blouse_man/Downloads/coding/github/6666/repo/src/clients/go/tb_client_test.go`
-- `/Users/blouse_man/Downloads/coding/github/6666/repo/src/clients/rust/tests/tests.rs`
-- `/Users/blouse_man/Downloads/coding/github/6666/repo/src/clients/node/src/test.ts`
-- `/Users/blouse_man/Downloads/coding/github/6666/repo/src/clients/dotnet/TigerBeetle.Tests/IntegrationTests.cs`
-- `/Users/blouse_man/Downloads/coding/github/6666/repo/src/clients/java/src/test/java/com/tigerbeetle/IntegrationTest.java`
-
-## Current limitation on running all upstream tests directly
-
-Running the original upstream suites directly against the OCaml server is the correct long-term target, but it is not fully wired up in this workspace yet:
-
-- The upstream repo pins Zig `0.14.1` and currently does not build cleanly on this macOS setup, so the exact native client artifacts expected by the Go, Rust, Node, .NET, and Java suites are not all available yet.
-- The checksum helper used by the OCaml server is still an external Zig-built artifact rather than a native Dune target. In this workspace, the helper already exists at `tb_ocaml/_build_tools/tb_checksum`, which is enough for the Dune workflow above.
-- The documented Dune alias for the upstream Python suite is a faithful run of the original upstream Python blackbox file. It is currently a compatibility check that fails honestly on behavior, not a rewritten test.
-
-The commands above document the current reproducible Dune-centered path for building the OCaml version, running it, and exercising it with both the local smoke test and the original upstream Python blackbox file.
+- Persistence is temporary test scaffolding, not a durable format.
+- Compatibility coverage is still shallow relative to upstream behavior.
+- Some upstream blackbox suites remain blocked by environment/tooling.
+- Inline tests are still blocked in this local macOS arm64 OCaml `5.4` switch.

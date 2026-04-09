@@ -1,3 +1,8 @@
+(** Text REPL parsing and rendering for the prototype CLI.
+
+    The intent is to keep command parsing separate from the binary protocol so
+    end-to-end CLI tests can exercise user-facing syntax independently. *)
+
 open Types
 
 type statement =

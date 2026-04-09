@@ -1,3 +1,12 @@
+(** Checksum helper process integration.
+
+    This module keeps the external Zig-based checksum helper at the edge of the
+    OCaml codebase so protocol code can stay pure over bytes.
+
+    Prototype note: every call spawns an external process. That is acceptable
+    for compatibility smoke tests, but it materially distorts any benchmark that
+    treats this path as representative production architecture. *)
+
 let helper_path () =
   match Sys.getenv_opt "TB_OCAML_CHECKSUM_BIN" with
   | Some path -> path

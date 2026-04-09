@@ -274,7 +274,8 @@ let account_status_name = function
       "tigerbeetle.CreateAccountStatus.linked_event_failed"
   | s when s = create_account_exists_with_different_flags ->
       "tigerbeetle.CreateAccountStatus.exists_with_different_flags"
-  | _ -> "tigerbeetle.CreateAccountStatus.unknown"
+  | status ->
+      Printf.sprintf "tigerbeetle.CreateAccountStatus.unknown(%ld)" status
 
 let transfer_status_name = function
   | s when s = create_transfer_created ->
@@ -329,7 +330,8 @@ let transfer_status_name = function
       "tigerbeetle.CreateTransferStatus.credit_account_already_closed"
   | s when s = create_transfer_exists_with_different_ledger ->
       "tigerbeetle.CreateTransferStatus.exists_with_different_ledger"
-  | _ -> "tigerbeetle.CreateTransferStatus.unknown"
+  | status ->
+      Printf.sprintf "tigerbeetle.CreateTransferStatus.unknown(%ld)" status
 
 let account_flag_names flags =
   let out = ref [] in

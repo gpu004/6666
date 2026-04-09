@@ -10,6 +10,7 @@ depends: [
   "yojson"
   "base-unix"
   "base-threads"
+  "odoc" {with-doc}
   "alcotest" {with-test}
   "qcheck" {with-test}
 ]

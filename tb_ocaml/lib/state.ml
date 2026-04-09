@@ -1,3 +1,9 @@
+(** Persistent ledger state and validation rules.
+
+    Prototype note: persistence currently uses [Marshal] snapshots. That keeps
+    the test harness simple, but it is temporary scaffolding rather than a
+    durable on-disk format to build long-term compatibility claims on. *)
+
 open Types
 
 module U128Tbl = Hashtbl.Make (struct

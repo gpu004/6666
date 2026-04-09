@@ -1,6 +1,9 @@
 
 .DS_Store
 **/.DS_Store
+__pycache__/
+*.py[cod]
+.venv_pytests/
 
 tb_ocaml/_build/
 tb_ocaml/.zig-cache/

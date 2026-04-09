@@ -112,6 +112,96 @@ let test_flag_names () =
        (Types.transfer_flag_pending lor Types.transfer_flag_closing_credit
       lor Types.transfer_flag_imported))
 
+let test_unknown_status_name_includes_code () =
+  check string "account unknown status includes numeric code"
+    "tigerbeetle.CreateAccountStatus.unknown(999)"
+    (Types.account_status_name 999l);
+  check string "transfer unknown status includes numeric code"
+    "tigerbeetle.CreateTransferStatus.unknown(888)"
+    (Types.transfer_status_name 888l)
+
+let test_repl_parse_create_accounts () =
+  match Repl.parse_command "create_accounts id=17 code=718 ledger=1" with
+  | Repl.CreateAccounts [ account ] ->
+      check u128 "account id" (U128.of_int 17) account.Types.id;
+      check int "account code" 718 account.Types.code;
+      check int32 "account ledger" 1l account.Types.ledger
+  | Repl.CreateAccounts _ -> fail "expected single create_accounts statement"
+  | Repl.CreateTransfers _ | Repl.LookupAccounts _ | Repl.LookupTransfers _
+  | Repl.QueryAccounts _ | Repl.QueryTransfers _ | Repl.GetAccountTransfers _
+  | Repl.GetAccountBalances _ ->
+      fail "expected create_accounts statement"
+
+let test_repl_parse_query_accounts () =
+  match
+    Repl.parse_command
+      "query_accounts user_data_64=55 ledger=3 code=71 flags=reversed limit=9"
+  with
+  | Repl.QueryAccounts filter ->
+      check int64 "query user_data_64" 55L filter.Types.user_data_64;
+      check int32 "query ledger" 3l filter.Types.ledger;
+      check int "query code" 71 filter.Types.code;
+      check int32 "query limit" 9l filter.Types.limit;
+      check int32 "query flags" 1l filter.Types.flags
+  | Repl.CreateAccounts _ | Repl.CreateTransfers _ | Repl.LookupAccounts _
+  | Repl.LookupTransfers _ | Repl.QueryTransfers _ | Repl.GetAccountTransfers _
+  | Repl.GetAccountBalances _ ->
+      fail "expected query_accounts statement"
+
+let with_state f =
+  let path = Filename.temp_file "tb_ocaml_state" ".db" in
+  Fun.protect
+    ~finally:(fun () -> if Sys.file_exists path then Sys.remove path)
+    (fun () ->
+      State.format ~path ~cluster:(U128.of_int 0);
+      let state = State.load path in
+      f state)
+
+let make_account ?(id = 1) ?(ledger = 1l) ?(code = 10) () =
+  {
+    Types.id = U128.of_int id;
+    debits_pending = U128.zero;
+    debits_posted = U128.zero;
+    credits_pending = U128.zero;
+    credits_posted = U128.zero;
+    user_data_128 = U128.zero;
+    user_data_64 = 0L;
+    user_data_32 = 0l;
+    ledger;
+    code;
+    flags = 0;
+    timestamp = 0L;
+  }
+
+let test_state_create_and_lookup_account () =
+  with_state (fun state ->
+      let created = State.create_accounts_batch state [ make_account () ] in
+      check int "one create result" 1 (List.length created);
+      check int32 "create status" Types.create_account_created
+        (List.hd created).Types.status;
+      let found = State.lookup_accounts_batch state [ U128.of_int 1 ] in
+      check int "one account found" 1 (List.length found);
+      check int "lookup preserves code" 10 (List.hd found).Types.code)
+
+let test_state_query_rejects_invalid_filter () =
+  with_state (fun state ->
+      ignore (State.create_accounts_batch state [ make_account () ]);
+      let invalid_filter =
+        {
+          Types.user_data_128 = U128.zero;
+          user_data_64 = 0L;
+          user_data_32 = 0l;
+          ledger = 0l;
+          code = 0;
+          timestamp_min = 10L;
+          timestamp_max = 5L;
+          limit = 10l;
+          flags = 0l;
+        }
+      in
+      check int "invalid filter returns no results" 0
+        (List.length (State.query_accounts_batch state invalid_filter)))
+
 let () =
   run "tb_ocaml unit"
     [
@@ -128,5 +218,23 @@ let () =
           test_case "create error filtering" `Quick
             test_create_error_encoding_filters_successes;
         ] );
-      ("types", [ test_case "flag names" `Quick test_flag_names ]);
+      ( "types",
+        [
+          test_case "flag names" `Quick test_flag_names;
+          test_case "unknown status names include codes" `Quick
+            test_unknown_status_name_includes_code;
+        ] );
+      ( "repl",
+        [
+          test_case "parse create_accounts" `Quick
+            test_repl_parse_create_accounts;
+          test_case "parse query_accounts" `Quick test_repl_parse_query_accounts;
+        ] );
+      ( "state",
+        [
+          test_case "create and lookup account" `Quick
+            test_state_create_and_lookup_account;
+          test_case "invalid query filter returns empty" `Quick
+            test_state_query_rejects_invalid_filter;
+        ] );
     ]

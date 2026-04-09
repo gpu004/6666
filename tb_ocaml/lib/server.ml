@@ -1,3 +1,13 @@
+(** TCP server loop for the TigerBeetle-compatible wire protocol.
+
+    This module keeps effects at the edge: it reads bytes from sockets, hands
+    typed requests to {!State}, and writes encoded replies back to clients.
+
+    Prototype note: request handling currently funnels through one mutex around
+    shared state. That keeps the implementation simple and deterministic, but
+    benchmark results mostly reflect prototype serialization rather than a
+    concurrency-oriented server design. *)
+
 open Types
 
 let request_checksum (header : Codec.request_header) = header.Codec.checksum

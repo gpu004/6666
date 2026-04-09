@@ -1,0 +1,33 @@
+{0 tb_ocaml}
+
+Prototype-grade TigerBeetle-compatible server and CLI in OCaml.
+
+The codebase is intentionally split around a small typed core:
+
+- {!module-U128} defines the 128-bit values used for identifiers, amounts, and checksums.
+- {!module-Types} centralizes protocol constants and ledger-facing records.
+- {!module-Multibatch} implements the batch trailer format used by request and reply payloads.
+- {!module-Codec} maps between typed values and the binary wire protocol.
+- {!module-State} owns persistence and ledger validation rules.
+- {!module-Server} and {!module-Repl} keep effects at the edge.
+
+The Dune documentation flow for this package is:
+
+{[
+  dune build @doc
+]}
+
+Generated HTML is written under:
+
+{[
+  _build/default/_doc/_html/
+]}
+
+Examples in the module interfaces mirror the executable tests in:
+
+- [tests/unit_tests.ml]
+- [tests/property_tests.ml]
+- [tests/cli.t]
+
+That keeps the docs honest: examples are short on purpose and should describe
+the same shapes the test suite relies on.

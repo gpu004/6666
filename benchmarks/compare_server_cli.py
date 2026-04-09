@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import shutil
 import statistics
 import subprocess
 import tempfile
@@ -10,10 +11,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-ROOT = Path("/Users/blouse_man/Downloads/coding/github/6666")
+ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OCAML_BIN = ROOT / "tb_ocaml/_build/default/bin/tigerbeetle.exe"
-DEFAULT_ZIG_BIN = Path("/tmp/tb_zig_release/tigerbeetle")
 DEFAULT_OCAML_CHECKSUM = ROOT / "tb_ocaml/_build_tools/tb_checksum"
+DEFAULT_ZIG_BIN = (
+    Path(os.environ["TB_ZIG_BIN"])
+    if "TB_ZIG_BIN" in os.environ
+    else (Path(shutil.which("tigerbeetle")) if shutil.which("tigerbeetle") else None)
+)
 
 
 def decode_objects(stdout: str):
@@ -141,6 +146,7 @@ class Server:
             check=True,
             capture_output=True,
             text=True,
+            env=self.impl.start_env(),
         )
         return decode_objects(completed.stdout)
 
@@ -234,6 +240,21 @@ def main():
     parser.add_argument("--ocaml-checksum-bin", type=Path, default=DEFAULT_OCAML_CHECKSUM)
     args = parser.parse_args()
 
+    if args.zig_bin is None:
+        raise SystemExit(
+            "missing Zig binary; pass --zig-bin=/path/to/tigerbeetle or set TB_ZIG_BIN"
+        )
+
+    prototype_notes = [
+        "The OCaml checksum path spawns an external helper process per checksum.",
+        "The OCaml server serializes stateful request handling behind one mutex.",
+        "The OCaml persistence layer uses Marshal snapshots for prototype simplicity.",
+        "This benchmark compares the current CLI/server workflow, not normalized engine throughput.",
+    ]
+    print("prototype benchmark notes:", file=os.sys.stderr)
+    for note in prototype_notes:
+        print(f"- {note}", file=os.sys.stderr)
+
     impls = [
         Impl("ocaml", args.ocaml_bin, args.ocaml_checksum_bin),
         Impl("zig", args.zig_bin),
@@ -247,7 +268,19 @@ def main():
             runs.append(benchmark_once(impl, accounts=args.accounts, batch_size=args.batch_size))
         all_results.append(summarize_runs(impl.name, runs))
 
-    print(json.dumps({"accounts": args.accounts, "batch_size": args.batch_size, "iterations": args.iterations, "results": all_results}, indent=2))
+    print(
+        json.dumps(
+            {
+                "root": str(ROOT),
+                "accounts": args.accounts,
+                "batch_size": args.batch_size,
+                "iterations": args.iterations,
+                "prototype_notes": prototype_notes,
+                "results": all_results,
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

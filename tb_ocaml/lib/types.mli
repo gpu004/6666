@@ -1,3 +1,8 @@
+(** Shared protocol, model, and status definitions for the compatibility layer.
+
+    This module centralizes public ledger-facing shapes and wire constants so
+    the rest of the codebase can stay smaller and more focused. *)
+
 type account = {
   id : U128.t;
   debits_pending : U128.t;
@@ -193,6 +198,10 @@ val bool_flag : int -> int -> bool
 val event_size : int -> int
 val result_size : int -> int
 val is_multi_batch : int -> bool
+
+(** Render public status and flag names that match client-facing expectations.
+*)
+
 val account_status_name : int32 -> string
 val transfer_status_name : int32 -> string
 val account_flag_names : int -> string list
