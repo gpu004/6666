@@ -10,6 +10,8 @@ depends: [
   "yojson"
   "base-unix"
   "base-threads"
+  "alcotest" {with-test}
+  "qcheck" {with-test}
 ]
 build: [
   ["dune" "build"]

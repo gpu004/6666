@@ -9,9 +9,25 @@ import time
 from pathlib import Path
 
 
-ROOT = Path("/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml")
-BIN = ROOT / "_build/default/bin/tigerbeetle.exe"
-CHECKSUM_BIN = ROOT / "_build_tools/tb_checksum"
+def resolve_path(env_name: str, default: Path, *, base: Path) -> Path:
+    raw = os.environ.get(env_name)
+    path = Path(raw) if raw else default
+    if not path.is_absolute():
+        path = (base / path).resolve()
+    return path
+
+
+ROOT = resolve_path(
+    "TB_OCAML_ROOT",
+    Path(__file__).resolve().parents[1],
+    base=Path.cwd(),
+)
+BIN = resolve_path("TB_OCAML_BIN", ROOT / "_build/default/bin/tigerbeetle.exe", base=ROOT)
+CHECKSUM_BIN = resolve_path(
+    "TB_OCAML_CHECKSUM_BIN",
+    ROOT / "_build_tools/tb_checksum",
+    base=ROOT,
+)
 HEADER_SIZE = 256
 REGISTER_REQUEST_SIZE = 256
 

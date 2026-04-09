@@ -1,0 +1,28 @@
+(test
+ (name unit_tests)
+ (libraries tb_ocaml alcotest))
+
+(test
+ (name property_tests)
+ (libraries tb_ocaml qcheck qcheck-core.runner))
+
+(cram
+ (deps ../bin/tigerbeetle.exe))
+
+(rule
+ (alias runtest)
+ (deps core_blackbox.py ../bin/tigerbeetle.exe)
+ (action
+  (setenv TB_OCAML_ROOT ../../..
+   (setenv TB_OCAML_BIN _build/default/bin/tigerbeetle.exe
+    (setenv TB_OCAML_CHECKSUM_BIN _build_tools/tb_checksum
+     (run python3 %{dep:core_blackbox.py}))))))
+
+(rule
+ (alias upstream-python-blackbox)
+ (deps run_upstream_python_blackbox.py ../bin/tigerbeetle.exe)
+ (action
+  (setenv TB_OCAML_ROOT ../../..
+   (setenv TB_OCAML_BIN _build/default/bin/tigerbeetle.exe
+    (setenv TB_OCAML_CHECKSUM_BIN _build_tools/tb_checksum
+     (run python3 %{dep:run_upstream_python_blackbox.py}))))))
