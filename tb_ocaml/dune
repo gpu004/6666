@@ -1,0 +1,6 @@
+(env
+ (_
+  (flags
+   (:standard
+    -w +A-41-42-70
+    -warn-error +A-41-42-70))))

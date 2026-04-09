@@ -79,9 +79,18 @@ ocamlformat --check $(find . -path './_build' -prune -o \( -name '*.ml' -o -name
 ocamlformat -i $(find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print)
 ```
 
-CI formatting is non-optional and is checked in:
+The baseline CI workflow runs the exact same core checks every time in:
 
-- `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_format.yml`
+- `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_ci.yml`
+
+The sequence is:
+
+```sh
+opam install . --deps-only --with-test
+dune build
+dune runtest
+ocamlformat --check $(find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print)
+```
 
 ## Warnings
 
@@ -104,6 +113,18 @@ This keeps warning noise near zero while still treating unused values, non-exhau
 CI enforcement is in:
 
 - `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_ci.yml`
+
+## Interfaces
+
+Important library modules now have explicit `.mli` files:
+
+- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/u128.mli`
+- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/types.mli`
+- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/multibatch.mli`
+- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/codec.mli`
+- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/state.mli`
+
+The biggest quality change is that `U128.t` and `State.t` are now abstract to callers. That stops accidental construction or mutation of internal state from the rest of the codebase and keeps the effectful server layer from reaching through state representation details.
 
 ## Run the OCaml version
 
@@ -162,6 +183,8 @@ dune runtest
 - the repo-local compatibility harness in `tb_ocaml/tests/core_blackbox.py`
 
 As of April 9, 2026, both `dune test` and `dune runtest` pass in this workspace.
+
+Because `dune runtest` includes the cram test in `tb_ocaml/tests/cli.t`, the baseline CI job also exercises the user-facing CLI surface instead of only the pure OCaml test executables.
 
 ### Run the upstream Python blackbox file against the OCaml server
 

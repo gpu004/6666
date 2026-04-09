@@ -13,14 +13,9 @@ type request_header = {
   operation : int;
 }
 
-type reply_header = {
-  size : int;
-  operation : int;
-  timestamp : int64;
-}
+type reply_header = { size : int; operation : int; timestamp : int64 }
 
 let get_u8 bytes off = Char.code (Bytes.get bytes off)
-
 let get_u16 bytes off = get_u8 bytes off lor (get_u8 bytes (off + 1) lsl 8)
 
 let get_i32 bytes off =
@@ -50,13 +45,15 @@ let set_u16 bytes off v =
 let set_i32 bytes off v =
   let open Int32 in
   for i = 0 to 3 do
-    set_u8 bytes (off + i) (to_int (logand (shift_right_logical v (8 * i)) 0xFFl))
+    set_u8 bytes (off + i)
+      (to_int (logand (shift_right_logical v (8 * i)) 0xFFl))
   done
 
 let set_i64 bytes off v =
   let open Int64 in
   for i = 0 to 7 do
-    set_u8 bytes (off + i) (to_int (logand (shift_right_logical v (8 * i)) 0xFFL))
+    set_u8 bytes (off + i)
+      (to_int (logand (shift_right_logical v (8 * i)) 0xFFL))
   done
 
 let set_u128 bytes off v =
@@ -64,13 +61,12 @@ let set_u128 bytes off v =
   Bytes.blit raw 0 bytes off 16
 
 let parse_request_header bytes =
-  if Bytes.length bytes <> header_size then invalid_arg "Codec.parse_request_header";
+  if Bytes.length bytes <> header_size then
+    invalid_arg "Codec.parse_request_header";
   {
     checksum = U128.of_le_bytes bytes 0;
     cluster = U128.of_le_bytes bytes 80;
-    size =
-      Int32.to_int
-        Int32.(logand (get_i32 bytes 96) 0x7FFF_FFFFl);
+    size = Int32.to_int Int32.(logand (get_i32 bytes 96) 0x7FFF_FFFFl);
     release = get_i32 bytes 108;
     command = get_u8 bytes 114;
     client = U128.of_le_bytes bytes 160;
@@ -81,8 +77,13 @@ let parse_request_header bytes =
   }
 
 let parse_reply_header bytes =
-  if Bytes.length bytes <> header_size then invalid_arg "Codec.parse_reply_header";
-  { size = Int32.to_int Int32.(logand (get_i32 bytes 96) 0x7FFF_FFFFl); operation = get_u8 bytes 236; timestamp = get_i64 bytes 224 }
+  if Bytes.length bytes <> header_size then
+    invalid_arg "Codec.parse_reply_header";
+  {
+    size = Int32.to_int Int32.(logand (get_i32 bytes 96) 0x7FFF_FFFFl);
+    operation = get_u8 bytes 236;
+    timestamp = get_i64 bytes 224;
+  }
 
 let decode_account bytes off =
   {
@@ -152,7 +153,8 @@ let encode_transfer (t : transfer) =
 
 let decode_id_batch bytes =
   let count = Bytes.length bytes / id_size in
-  Array.init count (fun i -> U128.of_le_bytes bytes (i * id_size)) |> Array.to_list
+  Array.init count (fun i -> U128.of_le_bytes bytes (i * id_size))
+  |> Array.to_list
 
 let encode_id id = U128.to_le_bytes id
 
@@ -232,7 +234,9 @@ let encode_create_error_result ~index ~status =
 let encode_create_results results =
   let out = Bytes.make (List.length results * create_result_size) '\x00' in
   List.iteri
-    (fun i r -> Bytes.blit (encode_create_result r) 0 out (i * create_result_size) create_result_size)
+    (fun i r ->
+      Bytes.blit (encode_create_result r) 0 out (i * create_result_size)
+        create_result_size)
     results;
   out
 
@@ -242,12 +246,16 @@ let encode_create_account_errors results =
     |> List.mapi (fun index r -> (index, r))
     |> List.filter (fun (_, r) -> r.status <> create_account_created)
   in
-  let out = Bytes.make (List.length failures * create_error_result_size) '\x00' in
+  let out =
+    Bytes.make (List.length failures * create_error_result_size) '\x00'
+  in
   List.iteri
     (fun i (index, r) ->
       Bytes.blit
         (encode_create_error_result ~index ~status:r.status)
-        0 out (i * create_error_result_size) create_error_result_size)
+        0 out
+        (i * create_error_result_size)
+        create_error_result_size)
     failures;
   out
 
@@ -257,26 +265,32 @@ let encode_create_transfer_errors results =
     |> List.mapi (fun index r -> (index, r))
     |> List.filter (fun (_, r) -> r.status <> create_transfer_created)
   in
-  let out = Bytes.make (List.length failures * create_error_result_size) '\x00' in
+  let out =
+    Bytes.make (List.length failures * create_error_result_size) '\x00'
+  in
   List.iteri
     (fun i (index, r) ->
       Bytes.blit
         (encode_create_error_result ~index ~status:r.status)
-        0 out (i * create_error_result_size) create_error_result_size)
+        0 out
+        (i * create_error_result_size)
+        create_error_result_size)
     failures;
   out
 
 let encode_accounts accounts =
   let out = Bytes.make (List.length accounts * account_size) '\x00' in
   List.iteri
-    (fun i a -> Bytes.blit (encode_account a) 0 out (i * account_size) account_size)
+    (fun i a ->
+      Bytes.blit (encode_account a) 0 out (i * account_size) account_size)
     accounts;
   out
 
 let encode_transfers transfers =
   let out = Bytes.make (List.length transfers * transfer_size) '\x00' in
   List.iteri
-    (fun i t -> Bytes.blit (encode_transfer t) 0 out (i * transfer_size) transfer_size)
+    (fun i t ->
+      Bytes.blit (encode_transfer t) 0 out (i * transfer_size) transfer_size)
     transfers;
   out
 
@@ -284,7 +298,8 @@ let encode_balances balances =
   let out = Bytes.make (List.length balances * account_balance_size) '\x00' in
   List.iteri
     (fun i b ->
-      Bytes.blit (encode_account_balance b) 0 out (i * account_balance_size) account_balance_size)
+      Bytes.blit (encode_account_balance b) 0 out (i * account_balance_size)
+        account_balance_size)
     balances;
   out
 
@@ -293,7 +308,8 @@ let encode_register_result () =
   set_i32 out 0 (Int32.of_int batch_size_limit);
   out
 
-let make_reply_header ~request_header ~body ~commit ~timestamp ~operation ~context =
+let make_reply_header ~request_header ~body ~commit ~timestamp ~operation
+    ~context =
   let header = Bytes.make header_size '\x00' in
   set_u128 header 80 request_header.cluster;
   set_i32 header 96 (Int32.of_int (header_size + Bytes.length body));
@@ -317,5 +333,8 @@ let make_reply_header ~request_header ~body ~commit ~timestamp ~operation ~conte
   header
 
 let make_reply ~request_header ~body ~commit ~timestamp ~operation ~context =
-  let header = make_reply_header ~request_header ~body ~commit ~timestamp ~operation ~context in
+  let header =
+    make_reply_header ~request_header ~body ~commit ~timestamp ~operation
+      ~context
+  in
   Bytes.cat header body

@@ -31,9 +31,8 @@ let ( let* ) = Gen.bind
 let return = Gen.return
 
 let gen_u128 =
-  let* hi = Gen.int64 in
-  let* lo = Gen.int64 in
-  return { U128.hi; lo }
+  let* raw = Gen.string_size ~gen:Gen.char (Gen.return 16) in
+  return (U128.of_le_bytes (Bytes.unsafe_of_string raw) 0)
 
 let arb_u128 = make ~print:U128.to_string gen_u128
 
@@ -91,7 +90,8 @@ let gen_account_filter : Types.account_filter Gen.t =
       flags;
     }
 
-let arb_account_filter = make ~print:(fun _ -> "<account_filter>") gen_account_filter
+let arb_account_filter =
+  make ~print:(fun _ -> "<account_filter>") gen_account_filter
 
 let gen_batch =
   let* chunk_count = Gen.int_bound 4 in
@@ -118,11 +118,14 @@ let arb_batches =
 let tests =
   [
     Test.make ~count:200 ~name:"U128 little-endian bytes roundtrip" arb_u128
-      (fun value -> U128.equal value (U128.of_le_bytes (U128.to_le_bytes value) 0));
-    Test.make ~count:200 ~name:"Codec account roundtrip" arb_account (fun account ->
-      equal_account account (Codec.decode_account (Codec.encode_account account) 0));
-    Test.make ~count:200 ~name:"Codec account_filter roundtrip" arb_account_filter
-      (fun filter ->
+      (fun value ->
+        U128.equal value (U128.of_le_bytes (U128.to_le_bytes value) 0));
+    Test.make ~count:200 ~name:"Codec account roundtrip" arb_account
+      (fun account ->
+        equal_account account
+          (Codec.decode_account (Codec.encode_account account) 0));
+    Test.make ~count:200 ~name:"Codec account_filter roundtrip"
+      arb_account_filter (fun filter ->
         equal_account_filter filter
           (Codec.decode_account_filter (Codec.encode_account_filter filter)));
     Test.make ~count:200 ~name:"MultiBatch encode/decode roundtrip" arb_batches

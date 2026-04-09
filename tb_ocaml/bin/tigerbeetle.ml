@@ -1,17 +1,18 @@
-open Types
-
 let usage () =
   print_endline "TigerBeetle compatibility build (OCaml)";
   print_endline "";
   print_endline "Commands:";
-  print_endline "  tigerbeetle format --cluster=0 --replica=0 --replica-count=1 <path>";
+  print_endline
+    "  tigerbeetle format --cluster=0 --replica=0 --replica-count=1 <path>";
   print_endline "  tigerbeetle start --addresses=3000 <path>";
-  print_endline "  tigerbeetle repl --cluster=0 --addresses=3000 --command=<command>";
+  print_endline
+    "  tigerbeetle repl --cluster=0 --addresses=3000 --command=<command>";
   print_endline "  tigerbeetle inspect --help";
   print_endline "  tigerbeetle version [--verbose]";
   print_endline "";
   print_endline "Examples:";
-  print_endline "  tigerbeetle repl --cluster=0 --addresses=3000 --command=create_accounts"
+  print_endline
+    "  tigerbeetle repl --cluster=0 --addresses=3000 --command=create_accounts"
 
 let inspect_help () =
   print_endline "TigerBeetle inspect compatibility help";
@@ -38,7 +39,9 @@ let take_flag prefix args =
   List.find_map
     (fun arg ->
       if String.starts_with ~prefix arg then
-        Some (String.sub arg (String.length prefix) (String.length arg - String.length prefix))
+        Some
+          (String.sub arg (String.length prefix)
+             (String.length arg - String.length prefix))
       else None)
     args
 
@@ -81,8 +84,7 @@ let run_repl args =
 
 let () =
   match Array.to_list Sys.argv with
-  | _ :: ("--help" | "help") :: _ ->
-      usage ()
+  | _ :: ("--help" | "help") :: _ -> usage ()
   | _ :: "format" :: args -> run_format args
   | _ :: "start" :: args -> run_start args
   | _ :: "repl" :: args -> run_repl args

@@ -13,10 +13,12 @@ type statement =
 let trim = String.trim
 
 let split_items s =
-  s |> String.split_on_char ',' |> List.map trim |> List.filter (fun x -> x <> "")
+  s |> String.split_on_char ',' |> List.map trim
+  |> List.filter (fun x -> x <> "")
 
 let parse_fields item =
-  item |> String.split_on_char ' ' |> List.map trim |> List.filter (fun x -> x <> "")
+  item |> String.split_on_char ' ' |> List.map trim
+  |> List.filter (fun x -> x <> "")
 
 let parse_kv token =
   match String.split_on_char '=' token with
@@ -29,14 +31,37 @@ let i32 s = Int32.of_string s
 let intv s = int_of_string s
 
 let default_account () =
-  { id = U128.zero; debits_pending = U128.zero; debits_posted = U128.zero; credits_pending = U128.zero;
-    credits_posted = U128.zero; user_data_128 = U128.zero; user_data_64 = 0L; user_data_32 = 0l;
-    ledger = 0l; code = 0; flags = 0; timestamp = 0L }
+  {
+    id = U128.zero;
+    debits_pending = U128.zero;
+    debits_posted = U128.zero;
+    credits_pending = U128.zero;
+    credits_posted = U128.zero;
+    user_data_128 = U128.zero;
+    user_data_64 = 0L;
+    user_data_32 = 0l;
+    ledger = 0l;
+    code = 0;
+    flags = 0;
+    timestamp = 0L;
+  }
 
 let default_transfer () =
-  { id = U128.zero; debit_account_id = U128.zero; credit_account_id = U128.zero; amount = U128.zero;
-    pending_id = U128.zero; user_data_128 = U128.zero; user_data_64 = 0L; user_data_32 = 0l;
-    timeout = 0l; ledger = 0l; code = 0; flags = 0; timestamp = 0L }
+  {
+    id = U128.zero;
+    debit_account_id = U128.zero;
+    credit_account_id = U128.zero;
+    amount = U128.zero;
+    pending_id = U128.zero;
+    user_data_128 = U128.zero;
+    user_data_64 = 0L;
+    user_data_32 = 0l;
+    timeout = 0l;
+    ledger = 0l;
+    code = 0;
+    flags = 0;
+    timestamp = 0L;
+  }
 
 let default_account_filter () =
   {
@@ -52,8 +77,17 @@ let default_account_filter () =
   }
 
 let default_query_filter () =
-  { user_data_128 = U128.zero; user_data_64 = 0L; user_data_32 = 0l; ledger = 0l; code = 0;
-    timestamp_min = 0L; timestamp_max = 0L; limit = Int32.of_int batch_size_limit; flags = 0l }
+  {
+    user_data_128 = U128.zero;
+    user_data_64 = 0L;
+    user_data_32 = 0l;
+    ledger = 0l;
+    code = 0;
+    timestamp_min = 0L;
+    timestamp_max = 0L;
+    limit = Int32.of_int batch_size_limit;
+    flags = 0l;
+  }
 
 let parse_account_flags = function
   | "" -> 0
@@ -77,8 +111,10 @@ let parse_transfer_flags = function
              match trim part with
              | "linked" -> acc lor transfer_flag_linked
              | "pending" -> acc lor transfer_flag_pending
-             | "post_pending_transfer" -> acc lor transfer_flag_post_pending_transfer
-             | "void_pending_transfer" -> acc lor transfer_flag_void_pending_transfer
+             | "post_pending_transfer" ->
+                 acc lor transfer_flag_post_pending_transfer
+             | "void_pending_transfer" ->
+                 acc lor transfer_flag_void_pending_transfer
              | "closing_debit" -> acc lor transfer_flag_closing_debit
              | "closing_credit" -> acc lor transfer_flag_closing_credit
              | "imported" -> acc lor transfer_flag_imported
@@ -130,12 +166,16 @@ let parse_command s =
     | x :: xs -> (x, String.concat " " xs)
   in
   match op with
-  | "create_accounts" -> CreateAccounts (List.map parse_account_item (split_items rest))
-  | "create_transfers" -> CreateTransfers (List.map parse_transfer_item (split_items rest))
+  | "create_accounts" ->
+      CreateAccounts (List.map parse_account_item (split_items rest))
+  | "create_transfers" ->
+      CreateTransfers (List.map parse_transfer_item (split_items rest))
   | "lookup_accounts" ->
-      LookupAccounts (split_items rest |> List.map (fun item -> u128 (snd (parse_kv item))))
+      LookupAccounts
+        (split_items rest |> List.map (fun item -> u128 (snd (parse_kv item))))
   | "lookup_transfers" ->
-      LookupTransfers (split_items rest |> List.map (fun item -> u128 (snd (parse_kv item))))
+      LookupTransfers
+        (split_items rest |> List.map (fun item -> u128 (snd (parse_kv item))))
   | "query_accounts" ->
       let f =
         List.fold_left
@@ -197,7 +237,8 @@ let parse_command s =
                 { a with flags = Int32.of_int flags }
             | "code" -> { a with code = intv v }
             | _ -> a)
-          (default_account_filter ()) (parse_fields rest)
+          (default_account_filter ())
+          (parse_fields rest)
       in
       GetAccountTransfers f
   | "get_account_balances" ->
@@ -223,7 +264,8 @@ let parse_command s =
                 { a with flags = Int32.of_int flags }
             | "code" -> { a with code = intv v }
             | _ -> a)
-          (default_account_filter ()) (parse_fields rest)
+          (default_account_filter ())
+          (parse_fields rest)
       in
       GetAccountBalances f
   | _ -> failwith ("unsupported repl operation: " ^ op)
@@ -283,7 +325,9 @@ let json_of_account (a : account) =
       ("user_data_32", `String (Int32.to_string a.user_data_32));
       ("ledger", `String (Int32.to_string a.ledger));
       ("code", `String (string_of_int a.code));
-      ("flags", `List (List.map (fun s -> `String s) (Types.account_flag_names a.flags)));
+      ( "flags",
+        `List (List.map (fun s -> `String s) (Types.account_flag_names a.flags))
+      );
       ("timestamp", `String (Int64.to_string a.timestamp));
     ]
 
@@ -301,7 +345,9 @@ let json_of_transfer (t : transfer) =
       ("timeout", `String (Int32.to_string t.timeout));
       ("ledger", `String (Int32.to_string t.ledger));
       ("code", `String (string_of_int t.code));
-      ("flags", `List (List.map (fun s -> `String s) (Types.transfer_flag_names t.flags)));
+      ( "flags",
+        `List
+          (List.map (fun s -> `String s) (Types.transfer_flag_names t.flags)) );
       ("timestamp", `String (Int64.to_string t.timestamp));
     ]
 
@@ -317,24 +363,28 @@ let json_of_balance (b : account_balance) =
 
 let json_of_create_result status_name r =
   `Assoc
-    [ ("timestamp", `String (Int64.to_string r.timestamp)); ("status", `String (status_name r.status)) ]
+    [
+      ("timestamp", `String (Int64.to_string r.timestamp));
+      ("status", `String (status_name r.status));
+    ]
 
 let rec render_json = function
   | `Assoc fields ->
       let lines =
         List.map
-          (fun (key, value) -> Printf.sprintf "  %S: %s" key (render_json value))
+          (fun (key, value) ->
+            Printf.sprintf "  %S: %s" key (render_json value))
           fields
       in
       "{\n" ^ String.concat ",\n" lines ^ "\n}"
-  | `List values ->
-      "[" ^ String.concat "," (List.map render_json values) ^ "]"
+  | `List values -> "[" ^ String.concat "," (List.map render_json values) ^ "]"
   | `String value -> Printf.sprintf "%S" value
   | _ -> failwith "unsupported repl json value"
 
 let print_json json = print_string (render_json json)
 
 let run ~cluster ~address ~command =
+  let reply_size (header : Codec.reply_header) = header.Codec.size in
   let fd =
     let host, port =
       match String.split_on_char ':' address with
@@ -347,14 +397,20 @@ let run ~cluster ~address ~command =
     fd
   in
   let read_reply fd =
-    let header = Codec.parse_reply_header (read_exact_fd fd header_size) in
-    let body_len = max 0 (header.size - header_size) in
-    let body = if body_len = 0 then Bytes.empty else read_exact_fd fd body_len in
+    let header : Codec.reply_header =
+      Codec.parse_reply_header (read_exact_fd fd header_size)
+    in
+    let body_len = max 0 (reply_size header - header_size) in
+    let body =
+      if body_len = 0 then Bytes.empty else read_exact_fd fd body_len
+    in
     (header, body)
   in
   let encode_ids ids =
     let out = Bytes.make (List.length ids * id_size) '\x00' in
-    List.iteri (fun i id -> Bytes.blit (Codec.encode_id id) 0 out (i * id_size) id_size) ids;
+    List.iteri
+      (fun i id -> Bytes.blit (Codec.encode_id id) 0 out (i * id_size) id_size)
+      ids;
     out
   in
   let client_id = U128.of_int 1 in
@@ -373,10 +429,17 @@ let run ~cluster ~address ~command =
               fun body ->
                 Multibatch.decode ~element_size:create_result_size body
                 |> List.concat_map (fun batch ->
-                       let count = Bytes.length batch / create_result_size in
-                       List.init count (fun i ->
-                           let r = { timestamp = Codec.get_i64 batch (i * create_result_size); status = Codec.get_i32 batch ((i * create_result_size) + 8) } in
-                           json_of_create_result Types.account_status_name r)) )
+                    let count = Bytes.length batch / create_result_size in
+                    List.init count (fun i ->
+                        let r =
+                          {
+                            timestamp =
+                              Codec.get_i64 batch (i * create_result_size);
+                            status =
+                              Codec.get_i32 batch ((i * create_result_size) + 8);
+                          }
+                        in
+                        json_of_create_result Types.account_status_name r)) )
         | CreateTransfers transfers ->
             let payload = Codec.encode_transfers transfers in
             ( op_create_transfers,
@@ -384,78 +447,110 @@ let run ~cluster ~address ~command =
               fun body ->
                 Multibatch.decode ~element_size:create_result_size body
                 |> List.concat_map (fun batch ->
-                       let count = Bytes.length batch / create_result_size in
-                       List.init count (fun i ->
-                           let r = { timestamp = Codec.get_i64 batch (i * create_result_size); status = Codec.get_i32 batch ((i * create_result_size) + 8) } in
-                           json_of_create_result Types.transfer_status_name r)) )
+                    let count = Bytes.length batch / create_result_size in
+                    List.init count (fun i ->
+                        let r =
+                          {
+                            timestamp =
+                              Codec.get_i64 batch (i * create_result_size);
+                            status =
+                              Codec.get_i32 batch ((i * create_result_size) + 8);
+                          }
+                        in
+                        json_of_create_result Types.transfer_status_name r)) )
         | LookupAccounts ids ->
             ( op_lookup_accounts,
               Multibatch.encode ~element_size:id_size [ encode_ids ids ],
               fun body ->
                 Multibatch.decode ~element_size:account_size body
                 |> List.concat_map (fun batch ->
-                       let count = Bytes.length batch / account_size in
-                       List.init count (fun i -> json_of_account (Codec.decode_account batch (i * account_size)))) )
+                    let count = Bytes.length batch / account_size in
+                    List.init count (fun i ->
+                        json_of_account
+                          (Codec.decode_account batch (i * account_size)))) )
         | LookupTransfers ids ->
             ( op_lookup_transfers,
               Multibatch.encode ~element_size:id_size [ encode_ids ids ],
               fun body ->
                 Multibatch.decode ~element_size:transfer_size body
                 |> List.concat_map (fun batch ->
-                       let count = Bytes.length batch / transfer_size in
-                       List.init count (fun i -> json_of_transfer (Codec.decode_transfer batch (i * transfer_size)))) )
+                    let count = Bytes.length batch / transfer_size in
+                    List.init count (fun i ->
+                        json_of_transfer
+                          (Codec.decode_transfer batch (i * transfer_size)))) )
         | QueryAccounts filter ->
             ( op_query_accounts,
-              Multibatch.encode ~element_size:query_filter_size [ Codec.encode_query_filter filter ],
+              Multibatch.encode ~element_size:query_filter_size
+                [ Codec.encode_query_filter filter ],
               fun body ->
                 Multibatch.decode ~element_size:account_size body
                 |> List.concat_map (fun batch ->
-                       let count = Bytes.length batch / account_size in
-                       List.init count (fun i -> json_of_account (Codec.decode_account batch (i * account_size)))) )
+                    let count = Bytes.length batch / account_size in
+                    List.init count (fun i ->
+                        json_of_account
+                          (Codec.decode_account batch (i * account_size)))) )
         | QueryTransfers filter ->
             ( op_query_transfers,
-              Multibatch.encode ~element_size:query_filter_size [ Codec.encode_query_filter filter ],
+              Multibatch.encode ~element_size:query_filter_size
+                [ Codec.encode_query_filter filter ],
               fun body ->
                 Multibatch.decode ~element_size:transfer_size body
                 |> List.concat_map (fun batch ->
-                       let count = Bytes.length batch / transfer_size in
-                       List.init count (fun i -> json_of_transfer (Codec.decode_transfer batch (i * transfer_size)))) )
+                    let count = Bytes.length batch / transfer_size in
+                    List.init count (fun i ->
+                        json_of_transfer
+                          (Codec.decode_transfer batch (i * transfer_size)))) )
         | GetAccountTransfers filter ->
             ( op_get_account_transfers,
-              Multibatch.encode ~element_size:account_filter_size [ Codec.encode_account_filter filter ],
+              Multibatch.encode ~element_size:account_filter_size
+                [ Codec.encode_account_filter filter ],
               fun body ->
                 Multibatch.decode ~element_size:transfer_size body
                 |> List.concat_map (fun batch ->
-                       let count = Bytes.length batch / transfer_size in
-                       List.init count (fun i -> json_of_transfer (Codec.decode_transfer batch (i * transfer_size)))) )
+                    let count = Bytes.length batch / transfer_size in
+                    List.init count (fun i ->
+                        json_of_transfer
+                          (Codec.decode_transfer batch (i * transfer_size)))) )
         | GetAccountBalances filter ->
             ( op_get_account_balances,
-              Multibatch.encode ~element_size:account_filter_size [ Codec.encode_account_filter filter ],
+              Multibatch.encode ~element_size:account_filter_size
+                [ Codec.encode_account_filter filter ],
               fun body ->
                 Multibatch.decode ~element_size:account_balance_size body
                 |> List.concat_map (fun batch ->
-                       let count = Bytes.length batch / account_balance_size in
-                       List.init count (fun i ->
-                           json_of_balance
-                             {
-                               debits_pending = U128.of_le_bytes batch (i * account_balance_size);
-                               debits_posted = U128.of_le_bytes batch ((i * account_balance_size) + 16);
-                               credits_pending = U128.of_le_bytes batch ((i * account_balance_size) + 32);
-                               credits_posted = U128.of_le_bytes batch ((i * account_balance_size) + 48);
-                               timestamp = Codec.get_i64 batch ((i * account_balance_size) + 64);
-                             })) )
+                    let count = Bytes.length batch / account_balance_size in
+                    List.init count (fun i ->
+                        json_of_balance
+                          {
+                            debits_pending =
+                              U128.of_le_bytes batch (i * account_balance_size);
+                            debits_posted =
+                              U128.of_le_bytes batch
+                                ((i * account_balance_size) + 16);
+                            credits_pending =
+                              U128.of_le_bytes batch
+                                ((i * account_balance_size) + 32);
+                            credits_posted =
+                              U128.of_le_bytes batch
+                                ((i * account_balance_size) + 48);
+                            timestamp =
+                              Codec.get_i64 batch
+                                ((i * account_balance_size) + 64);
+                          })) )
       in
-      write_all_fd fd (make_request cluster client_id 1L 1 operation body_payload);
+      write_all_fd fd
+        (make_request cluster client_id 1L 1 operation body_payload);
       let _reply_header, body = read_reply fd in
       let jsons = result_jsons body in
-      begin
-        match jsons with
-        | [] -> ()
-        | [ one ] ->
-            print_json one;
-            output_char stdout '\n'
-        | many ->
-            List.iter (fun json ->
-                print_json json;
-                output_char stdout '\n') many
+      begin match jsons with
+      | [] -> ()
+      | [ one ] ->
+          print_json one;
+          output_char stdout '\n'
+      | many ->
+          List.iter
+            (fun json ->
+              print_json json;
+              output_char stdout '\n')
+            many
       end)

@@ -1,4 +1,6 @@
 (library
  (name tb_ocaml)
  (wrapped false)
+ (instrumentation
+  (backend bisect_ppx))
  (libraries unix threads yojson))

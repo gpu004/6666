@@ -1,0 +1,53 @@
+name: tb_ocaml coverage
+
+on:
+  push:
+    paths:
+      - ".github/workflows/tb_ocaml_coverage.yml"
+      - "tb_ocaml/**"
+      - "README.md"
+  pull_request:
+    paths:
+      - ".github/workflows/tb_ocaml_coverage.yml"
+      - "tb_ocaml/**"
+      - "README.md"
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tb_ocaml
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5.3.0
+
+      - name: Install dependencies
+        run: |
+          opam install . --deps-only --with-test
+          opam install bisect_ppx
+
+      - name: Run coverage-instrumented tests
+        run: |
+          rm -rf _coverage
+          mkdir -p _coverage
+          BISECT_SILENT=YES dune runtest --instrument-with bisect_ppx --force
+
+      - name: Generate coverage summary
+        run: opam exec -- bisect-ppx-report summary
+
+      - name: Generate HTML report
+        run: opam exec -- bisect-ppx-report html
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tb_ocaml-coverage-html
+          path: tb_ocaml/_coverage

@@ -1,0 +1,46 @@
+name: tb_ocaml ci
+
+on:
+  push:
+    paths:
+      - ".github/workflows/tb_ocaml_ci.yml"
+      - "tb_ocaml/**"
+      - "README.md"
+  pull_request:
+    paths:
+      - ".github/workflows/tb_ocaml_ci.yml"
+      - "tb_ocaml/**"
+      - "README.md"
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tb_ocaml
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5.4.0
+
+      - name: Install dependencies
+        run: |
+          opam install . --deps-only --with-test
+          opam install -y ocamlformat.0.28.1
+
+      - name: Build
+        run: dune build
+
+      - name: Run Dune runtest
+        run: dune runtest
+
+      - name: Check formatting
+        run: |
+          find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print0 \
+            | xargs -0 opam exec -- ocamlformat --check

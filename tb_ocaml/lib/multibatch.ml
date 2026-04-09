@@ -10,10 +10,12 @@ let decode ~element_size body =
   let len = Bytes.length body in
   if len < 2 then invalid_arg "MultiBatch.decode";
   let read_u16 off =
-    (Char.code (Bytes.get body off)) lor ((Char.code (Bytes.get body (off + 1))) lsl 8)
+    Char.code (Bytes.get body off)
+    lor (Char.code (Bytes.get body (off + 1)) lsl 8)
   in
   let batch_count = read_u16 (len - 2) in
-  if batch_count <= 0 || batch_count >= 0xFFFF then invalid_arg "MultiBatch.decode";
+  if batch_count <= 0 || batch_count >= 0xFFFF then
+    invalid_arg "MultiBatch.decode";
   let trailer_size = trailer_total_size ~element_size ~batch_count in
   if trailer_size > len then invalid_arg "MultiBatch.decode";
   let trailer_start = len - trailer_size in
@@ -24,9 +26,12 @@ let decode ~element_size body =
     if v <> 0xFFFF then invalid_arg "MultiBatch.decode"
   done;
   let counts =
-    Array.init batch_count (fun i -> read_u16 (trailer_start + ((padding_items + i) * 2)))
+    Array.init batch_count (fun i ->
+        read_u16 (trailer_start + ((padding_items + i) * 2)))
   in
-  let payload_size = Array.fold_left (fun acc n -> acc + (n * element_size)) 0 counts in
+  let payload_size =
+    Array.fold_left (fun acc n -> acc + (n * element_size)) 0 counts
+  in
   if payload_size <> trailer_start then invalid_arg "MultiBatch.decode";
   let cursor = ref 0 in
   Array.to_list
@@ -43,7 +48,9 @@ let encode ~element_size batches =
   | [] -> invalid_arg "MultiBatch.encode"
   | _ ->
       let batch_count = List.length batches in
-      let payload_size = List.fold_left (fun acc b -> acc + Bytes.length b) 0 batches in
+      let payload_size =
+        List.fold_left (fun acc b -> acc + Bytes.length b) 0 batches
+      in
       let trailer_size = trailer_total_size ~element_size ~batch_count in
       let total = payload_size + trailer_size in
       let out = Bytes.make total '\x00' in

@@ -71,9 +71,18 @@ cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
 ocamlformat -i $(find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print)
 ```
 
-CI enforces formatting in:
+The baseline CI workflow runs the exact same core checks every time in:
 
-- `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_format.yml`
+- `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_ci.yml`
+
+The sequence is:
+
+```sh
+opam install . --deps-only --with-test
+dune build
+dune runtest
+ocamlformat --check $(find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print)
+```
 
 ## Warnings
 
@@ -96,6 +105,23 @@ So new warnings fail the build. The excluded warnings are:
 CI enforces this in:
 
 - `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_ci.yml`
+
+## Interfaces
+
+The core library modules now have explicit `.mli` files:
+
+- `lib/u128.mli`
+- `lib/types.mli`
+- `lib/multibatch.mli`
+- `lib/codec.mli`
+- `lib/state.mli`
+
+The most important abstraction boundaries are:
+
+- `U128.t` is abstract outside `lib/u128.ml`
+- `State.t` is abstract outside `lib/state.ml`
+
+That means callers cannot reach into internal representation details directly. The server and CLI now consume explicit APIs instead of state internals, which makes misuse harder and refactoring safer.
 
 ## Run
 
@@ -151,6 +177,8 @@ dune runtest
 - the repo-local blackbox smoke harness from `tests/core_blackbox.py`
 
 As of April 9, 2026, both commands pass in this workspace.
+
+Because `dune runtest` includes `tests/cli.t`, the baseline CI job also runs the cram CLI checks.
 
 Run the original upstream Python blackbox file against the OCaml server:
 

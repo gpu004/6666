@@ -1,3 +1,5 @@
 (executable
  (name tigerbeetle)
+ (instrumentation
+  (backend bisect_ppx))
  (libraries tb_ocaml unix threads yojson))

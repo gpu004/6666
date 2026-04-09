@@ -19,6 +19,7 @@ let compute bytes =
      with End_of_file -> ());
     Buffer.contents b
   in
-  match Unix.close_process_full (cin, cout, cerr) with
-  | Unix.WEXITED 0 -> U128.of_le_bytes (Bytes.unsafe_of_string result) 0
-  | _ -> failwith "checksum helper failed"
+  let status = Unix.close_process_full (cin, cout, cerr) in
+  if status = Unix.WEXITED 0 then
+    U128.of_le_bytes (Bytes.unsafe_of_string result) 0
+  else failwith "checksum helper failed"

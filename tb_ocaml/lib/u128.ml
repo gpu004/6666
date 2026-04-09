@@ -1,12 +1,8 @@
-type t = {
-  hi : int64;
-  lo : int64;
-}
+type t = { hi : int64; lo : int64 }
 
 let zero = { hi = 0L; lo = 0L }
 let one = { hi = 0L; lo = 1L }
 let max_value = { hi = Int64.minus_one; lo = Int64.minus_one }
-
 let min_int64 = Int64.min_int
 
 let compare_u64 a b =
@@ -37,11 +33,13 @@ let sub a b =
 let of_u32_parts a3 a2 a1 a0 =
   let open Int64 in
   let lo =
-    logor (shift_left (logand (of_int32 a1) 0xFFFF_FFFFL) 32)
+    logor
+      (shift_left (logand (of_int32 a1) 0xFFFF_FFFFL) 32)
       (logand (of_int32 a0) 0xFFFF_FFFFL)
   in
   let hi =
-    logor (shift_left (logand (of_int32 a3) 0xFFFF_FFFFL) 32)
+    logor
+      (shift_left (logand (of_int32 a3) 0xFFFF_FFFFL) 32)
       (logand (of_int32 a2) 0xFFFF_FFFFL)
   in
   { hi; lo }
@@ -95,8 +93,7 @@ let divmod_10 t =
   let rem = ref 0L in
   for i = 0 to 3 do
     let cur =
-      Int64.add
-        (Int64.shift_left !rem 32)
+      Int64.add (Int64.shift_left !rem 32)
         (Int64.logand (Int64.of_int32 limbs.(i)) 0xFFFF_FFFFL)
     in
     out.(i) <- Int64.to_int32 (Int64.div cur 10L);
@@ -118,12 +115,11 @@ let to_string t =
     String.init (String.length s) (fun i -> s.[String.length s - 1 - i])
 
 let of_le_bytes bytes off =
-  let open Int64 in
-  let rec load64 o =
+  let load64 o =
     let v = ref 0L in
     for i = 0 to 7 do
-      let b = of_int (Char.code (Bytes.get bytes (o + i))) in
-      v := logor !v (shift_left b (8 * i))
+      let b = Int64.of_int (Char.code (Bytes.get bytes (o + i))) in
+      v := Int64.logor !v (Int64.shift_left b (8 * i))
     done;
     !v
   in
