@@ -1,6 +1,15 @@
-# Tiger Metal in OCaml
+# TigerBeetle in OCaml
 
-This repository contains an OCaml TigerBeetle-compatible server/CLI and the upstream Zig TigerBeetle repository used as the reference implementation.
+This repository is a prototype-grade OCaml recreation inspired by TigerBeetle, with the upstream Zig TigerBeetle repository kept here as the reference implementation.
+
+This project does not attempt to reimplement the whole TigerBeetle system. It only builds partial functionality, compares selected components against the upstream project, and uses those focused comparisons to guide the OCaml prototype.
+
+## Prototype scope
+
+- This repository is a prototype only.
+- The OCaml code implements partial functionality rather than the full TigerBeetle feature set.
+- The work here compares specific parts of the upstream project, not the entire system end to end.
+- The current focus is on selected CLI, server, protocol, state, testing, and benchmark surfaces that are practical to reproduce and evaluate in OCaml.
 
 The OCaml workflow is Dune-first:
 
@@ -55,6 +64,46 @@ pip install -U pip pytest tigerbeetle
 cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
 dune build
 ```
+
+## Formatting
+
+Formatting is enforced with `ocamlformat` and a project-local config at:
+
+- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/.ocamlformat`
+
+Local commands:
+
+```sh
+cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
+ocamlformat --check $(find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print)
+ocamlformat -i $(find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print)
+```
+
+CI formatting is non-optional and is checked in:
+
+- `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_format.yml`
+
+## Warnings
+
+Compiler warnings are strict by default in:
+
+- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/dune`
+
+The project now builds with:
+
+- `-w +A-41-42-70`
+- `-warn-error +A-41-42-70`
+
+That means warnings fail the build, with these narrow exceptions:
+
+- warning `70` is excluded so the project does not force placeholder `.mli` files for every module
+- warnings `41` and `42` are excluded because they are about record-label disambiguation and compatibility with very old OCaml syntax, not current correctness in this OCaml `5.4` codebase
+
+This keeps warning noise near zero while still treating unused values, non-exhaustive matches, fragile pattern matches, and similar issues as CI-breaking problems.
+
+CI enforcement is in:
+
+- `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_ci.yml`
 
 ## Run the OCaml version
 
@@ -141,6 +190,45 @@ opam install -y -j1 ppx_inline_test
 ```
 
 failed on this machine with `signal 7` while building transitive dependencies `ppx_derivers`, `ocaml-compiler-libs`, and `jane-street-headers`. So the repository is now split into unit, property, cram, and blackbox layers under Dune, but the inline-test layer is documented as blocked by the current opam environment rather than partially enabled.
+
+## Coverage
+
+Coverage support is wired into the OCaml Dune stanzas with `bisect_ppx` instrumentation on:
+
+- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/dune`
+- `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/bin/dune`
+
+The intended coverage commands are:
+
+```sh
+cd /Users/blouse_man/Downloads/coding/github/6666/tb_ocaml
+BISECT_SILENT=YES dune runtest --instrument-with bisect_ppx --force
+bisect-ppx-report summary
+bisect-ppx-report html
+```
+
+That produces the HTML report in `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/_coverage/index.html`.
+
+Current local blocker:
+
+- the current developer switch is OCaml `5.4.0`
+- `opam show bisect_ppx` currently resolves to `2.8.3`
+- that package depends on `ppxlib < 0.36.0`
+- on this machine that conflicts with OCaml `5.4.0`, so `opam install bisect_ppx` does not solve in the current switch
+
+Because of that, the repository now checks coverage in CI instead of pretending local coverage works on this switch. The workflow is:
+
+- `/Users/blouse_man/Downloads/coding/github/6666/.github/workflows/tb_ocaml_coverage.yml`
+
+That job runs coverage on OCaml `5.3.0`, generates both the terminal summary and the HTML report, and uploads the report as an artifact.
+
+Use coverage to find untested branches in core logic such as:
+
+- request/reply codec paths in `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/codec.ml`
+- multibatch edge cases in `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/multibatch.ml`
+- validation and ledger state transitions in `/Users/blouse_man/Downloads/coding/github/6666/tb_ocaml/lib/state.ml`
+
+The target is not fake `100%`. The useful bar is high coverage on core library logic, with lower expectations on CLI glue, wrappers, and mechanical entrypoints.
 
 ### Benchmark OCaml vs Zig on the shared CLI/server surface
 
