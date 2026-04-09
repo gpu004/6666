@@ -1,6 +1,6 @@
 opam-version: "2.0"
-synopsis: "Small OCaml compatibility build inspired by TigerBeetle"
-description: "An OCaml rewrite of a small TigerBeetle-compatible surface for experimentation and learning."
+synopsis: "Prototype-grade OCaml compatibility build inspired by TigerBeetle"
+description: "A prototype-grade OCaml rewrite of selected TigerBeetle-compatible surfaces for experimentation, learning, and focused comparison with parts of the upstream project."
 maintainer: "tusharhqq"
 authors: ["tusharhqq"]
 dev-repo: "git+https://github.com/tusharhqq/6666.git"
