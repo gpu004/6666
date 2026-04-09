@@ -19,6 +19,9 @@ let write_all fd buf =
   loop 0 (Bytes.length buf)
 
 let body_timestamp_from_results state batches result_size =
+  if result_size = create_error_result_size then
+    if state.State.next_timestamp = 0L then 1L else state.State.next_timestamp
+  else
   let extract_timestamp batch off = Codec.get_i64 batch off in
   let timestamps =
     List.concat_map
@@ -36,6 +39,11 @@ let body_timestamp_from_results state batches result_size =
 let process_request state (header : Codec.request_header) body =
   State.ensure_expired_and_saved state;
   let commit = State.next_commit state in
+  let create_changed op =
+    op = op_deprecated_create_accounts_unbatched || op = op_deprecated_create_transfers_unbatched
+    || op = op_deprecated_create_accounts_sparse || op = op_deprecated_create_transfers_sparse
+    || op = op_create_accounts || op = op_create_transfers
+  in
   let empty_multibatch_response op =
     let timestamp = if state.State.next_timestamp = 0L then 1L else state.State.next_timestamp in
     ( Codec.make_reply ~request_header:header ~body:Bytes.empty ~commit ~timestamp ~operation:op
@@ -64,6 +72,20 @@ let process_request state (header : Codec.request_header) body =
           let event_batches = Multibatch.decode ~element_size:(Types.event_size op) body in
           let result_batches =
             match op with
+            | o when o = op_deprecated_create_accounts_sparse ->
+                List.map
+                  (fun batch ->
+                    let count = Bytes.length batch / account_size in
+                    let events = List.init count (fun i -> Codec.decode_account batch (i * account_size)) in
+                    Codec.encode_create_account_errors (State.create_accounts_batch state events))
+                  event_batches
+            | o when o = op_deprecated_create_transfers_sparse ->
+                List.map
+                  (fun batch ->
+                    let count = Bytes.length batch / transfer_size in
+                    let events = List.init count (fun i -> Codec.decode_transfer batch (i * transfer_size)) in
+                    Codec.encode_create_transfer_errors (State.create_transfers_batch state events))
+                  event_batches
             | o when o = op_create_accounts ->
                 List.map
                   (fun batch ->
@@ -92,14 +114,47 @@ let process_request state (header : Codec.request_header) body =
                 List.map (fun batch -> Codec.encode_balances (State.get_account_balances_batch state (Codec.decode_account_filter batch))) event_batches
             | _ -> List.map (fun _ -> Bytes.empty) event_batches
           in
-          let changed = op = op_create_accounts || op = op_create_transfers in
+          let changed = create_changed op in
           (result_batches, changed)
-        else ([], false)
+        else
+          let body, changed =
+            match op with
+            | o when o = op_deprecated_create_accounts_unbatched ->
+                let count = Bytes.length body / account_size in
+                let events = List.init count (fun i -> Codec.decode_account body (i * account_size)) in
+                (Codec.encode_create_account_errors (State.create_accounts_batch state events), true)
+            | o when o = op_deprecated_create_transfers_unbatched ->
+                let count = Bytes.length body / transfer_size in
+                let events = List.init count (fun i -> Codec.decode_transfer body (i * transfer_size)) in
+                (Codec.encode_create_transfer_errors (State.create_transfers_batch state events), true)
+            | o when o = op_deprecated_lookup_accounts_unbatched ->
+                (Codec.encode_accounts (State.lookup_accounts_batch state (Codec.decode_id_batch body)), false)
+            | o when o = op_deprecated_lookup_transfers_unbatched ->
+                (Codec.encode_transfers (State.lookup_transfers_batch state (Codec.decode_id_batch body)), false)
+            | o when o = op_deprecated_get_account_transfers_unbatched ->
+                (Codec.encode_transfers (State.get_account_transfers_batch state (Codec.decode_account_filter body)), false)
+            | o when o = op_deprecated_get_account_balances_unbatched ->
+                (Codec.encode_balances (State.get_account_balances_batch state (Codec.decode_account_filter body)), false)
+            | o when o = op_deprecated_query_accounts_unbatched ->
+                (Codec.encode_accounts (State.query_accounts_batch state (Codec.decode_query_filter body)), false)
+            | o when o = op_deprecated_query_transfers_unbatched ->
+                (Codec.encode_transfers (State.query_transfers_batch state (Codec.decode_query_filter body)), false)
+            | _ -> (Bytes.empty, false)
+          in
+          ([ body ], changed)
       in
       if Types.is_multi_batch op && Bytes.length body = 0 then empty_multibatch_response op
       else (
         if changed then State.save state;
-        let body = Multibatch.encode ~element_size:(Types.result_size op) result_batches in
+        let body =
+          if Types.is_multi_batch op then
+            Multibatch.encode ~element_size:(Types.result_size op) result_batches
+          else
+            match result_batches with
+            | [ body ] -> body
+            | [] -> Bytes.empty
+            | _ -> invalid_arg "process_request: unexpected non-multibatch batch count"
+        in
         let timestamp = body_timestamp_from_results state result_batches (Types.result_size op) in
         (Codec.make_reply ~request_header:header ~body ~commit ~timestamp ~operation:op
            ~context:header.checksum, changed))

@@ -223,11 +223,47 @@ let encode_create_result (r : create_result) =
   set_i32 out 8 r.status;
   out
 
+let encode_create_error_result ~index ~status =
+  let out = Bytes.make create_error_result_size '\x00' in
+  set_i32 out 0 (Int32.of_int index);
+  set_i32 out 4 status;
+  out
+
 let encode_create_results results =
   let out = Bytes.make (List.length results * create_result_size) '\x00' in
   List.iteri
     (fun i r -> Bytes.blit (encode_create_result r) 0 out (i * create_result_size) create_result_size)
     results;
+  out
+
+let encode_create_account_errors results =
+  let failures =
+    results
+    |> List.mapi (fun index r -> (index, r))
+    |> List.filter (fun (_, r) -> r.status <> create_account_created)
+  in
+  let out = Bytes.make (List.length failures * create_error_result_size) '\x00' in
+  List.iteri
+    (fun i (index, r) ->
+      Bytes.blit
+        (encode_create_error_result ~index ~status:r.status)
+        0 out (i * create_error_result_size) create_error_result_size)
+    failures;
+  out
+
+let encode_create_transfer_errors results =
+  let failures =
+    results
+    |> List.mapi (fun index r -> (index, r))
+    |> List.filter (fun (_, r) -> r.status <> create_transfer_created)
+  in
+  let out = Bytes.make (List.length failures * create_error_result_size) '\x00' in
+  List.iteri
+    (fun i (index, r) ->
+      Bytes.blit
+        (encode_create_error_result ~index ~status:r.status)
+        0 out (i * create_error_result_size) create_error_result_size)
+    failures;
   out
 
 let encode_accounts accounts =

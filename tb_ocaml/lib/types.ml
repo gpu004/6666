@@ -11,7 +11,17 @@ let command_reply = 8
 
 let op_register = 2
 let op_pulse = 4
+let op_deprecated_create_accounts_unbatched = 129
+let op_deprecated_create_transfers_unbatched = 130
+let op_deprecated_lookup_accounts_unbatched = 131
+let op_deprecated_lookup_transfers_unbatched = 132
+let op_deprecated_get_account_transfers_unbatched = 133
+let op_deprecated_get_account_balances_unbatched = 134
+let op_deprecated_query_accounts_unbatched = 135
+let op_deprecated_query_transfers_unbatched = 136
 let op_get_change_events = 137
+let op_deprecated_create_accounts_sparse = 138
+let op_deprecated_create_transfers_sparse = 139
 let op_lookup_accounts = 140
 let op_lookup_transfers = 141
 let op_get_account_transfers = 142
@@ -115,6 +125,7 @@ let account_filter_size = 128
 let query_filter_size = 64
 let account_balance_size = 128
 let create_result_size = 16
+let create_error_result_size = 8
 let register_request_size = 256
 let register_result_size = 64
 
@@ -194,6 +205,16 @@ let amount_max = U128.max_value
 let bool_flag flags bit = flags land bit <> 0
 
 let event_size = function
+  | op when op = op_deprecated_create_accounts_unbatched -> account_size
+  | op when op = op_deprecated_create_transfers_unbatched -> transfer_size
+  | op when op = op_deprecated_lookup_accounts_unbatched || op = op_deprecated_lookup_transfers_unbatched ->
+      id_size
+  | op when op = op_deprecated_get_account_transfers_unbatched || op = op_deprecated_get_account_balances_unbatched ->
+      account_filter_size
+  | op when op = op_deprecated_query_accounts_unbatched || op = op_deprecated_query_transfers_unbatched ->
+      query_filter_size
+  | op when op = op_deprecated_create_accounts_sparse -> account_size
+  | op when op = op_deprecated_create_transfers_sparse -> transfer_size
   | op when op = op_create_accounts -> account_size
   | op when op = op_create_transfers -> transfer_size
   | op when op = op_lookup_accounts || op = op_lookup_transfers -> id_size
@@ -203,6 +224,24 @@ let event_size = function
   | _ -> 0
 
 let result_size = function
+  | op
+    when op = op_deprecated_create_accounts_unbatched
+         || op = op_deprecated_create_transfers_unbatched
+         || op = op_deprecated_create_accounts_sparse
+         || op = op_deprecated_create_transfers_sparse ->
+      create_error_result_size
+  | op when op = op_deprecated_lookup_accounts_unbatched || op = op_deprecated_query_accounts_unbatched ->
+      account_size
+  | op
+    when op = op_deprecated_lookup_transfers_unbatched
+         || op = op_deprecated_get_account_transfers_unbatched
+         || op = op_deprecated_query_transfers_unbatched ->
+      transfer_size
+  | op when op = op_deprecated_get_account_balances_unbatched -> account_balance_size
+  | op
+    when op = op_deprecated_create_accounts_sparse
+         || op = op_deprecated_create_transfers_sparse ->
+      create_error_result_size
   | op when op = op_create_accounts || op = op_create_transfers -> create_result_size
   | op when op = op_lookup_accounts || op = op_query_accounts -> account_size
   | op when op = op_lookup_transfers || op = op_get_account_transfers || op = op_query_transfers ->
@@ -213,7 +252,9 @@ let result_size = function
 
 let is_multi_batch = function
   | op
-    when op = op_create_accounts || op = op_create_transfers || op = op_lookup_accounts
+    when op = op_deprecated_create_accounts_sparse
+         || op = op_deprecated_create_transfers_sparse || op = op_create_accounts
+         || op = op_create_transfers || op = op_lookup_accounts
          || op = op_lookup_transfers || op = op_get_account_transfers
          || op = op_get_account_balances || op = op_query_accounts || op = op_query_transfers ->
       true
