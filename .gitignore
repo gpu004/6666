@@ -1,3 +1,11 @@
 
+.DS_Store
+**/.DS_Store
+
+tb_ocaml/_build/
+tb_ocaml/.zig-cache/
+tb_ocaml/_build_tools/
+tb_ocaml/*.tigerbeetle
+
+zig/cache/
 zig/zig
-repo/

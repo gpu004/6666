@@ -6,7 +6,7 @@ pub fn build(b: *std.Build) void {
     const exe = b.addExecutable(.{
         .name = "tb_checksum",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("../repo/src/ocaml_tb_checksum.zig"),
+            .root_source_file = b.path("ocaml_tb_checksum.zig"),
             .target = target,
             .optimize = optimize,
         }),

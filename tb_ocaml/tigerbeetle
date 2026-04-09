@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="${0:A:h}"
 TOOLS_DIR="$ROOT/_build_tools"
-CHECKSUM_SRC="$ROOT/../repo/src/ocaml_tb_checksum.zig"
+CHECKSUM_SRC="$ROOT/ocaml_tb_checksum.zig"
 CHECKSUM_BIN="$TOOLS_DIR/tb_checksum"
 MAIN_BIN="$ROOT/_build/default/bin/tigerbeetle.exe"
 
