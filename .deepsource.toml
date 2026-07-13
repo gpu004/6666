@@ -1,0 +1,19 @@
+version = 1
+
+# The pinned upstream tree and its local copy are behavior references, not code
+# maintained by this rewrite. Analyze the OCaml implementation and its support
+# files instead.
+exclude_patterns = [
+  "path/to/tigerbeetle/**",
+  "ocam/src/**/*.zig",
+  "ocam/_build/**",
+  "ocam/zig/**",
+]
+
+test_patterns = [
+  "ocam/test/**",
+]
+
+[[analyzers]]
+name = "secrets"
+enabled = true

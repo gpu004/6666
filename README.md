@@ -43,6 +43,14 @@ violates a TigerBeetle internal commit-sequencing invariant after the first
 commit. It is therefore not included in the build instructions or presented as
 a comparison result.
 
+## Code analysis
+
+DeepSource is configured in [`.deepsource.toml`](.deepsource.toml) for secret
+scanning. The pinned upstream source and its local Zig copy are excluded because
+they are behavior references rather than maintained rewrite code. After merging
+the configuration to the repository's default branch, activate Code Review in
+the DeepSource repository settings.
+
 ## Documentation
 
 Start with the [ledger-core guide](doc/README.md). It describes the state
