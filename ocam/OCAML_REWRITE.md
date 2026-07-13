@@ -16,7 +16,12 @@ opam exec -- dune build @bench
 ```
 
 The benchmark reports operations/second, per-batch latency, total allocated
-words, and allocated words per operation.
+words, and allocated words per operation. It uses 30,000 prebuilt successful
+transfers in batches of 30 so that request construction is outside the timed
+path. Run `sh bench/run_state_machine_comparison.sh` from this directory to
+also measure the pinned Zig state machine; see
+[`../BENCHMARK_COMPARISON.md`](../BENCHMARK_COMPARISON.md) for the scope and
+comparison rules.
 
 ## Boundary and current coverage
 

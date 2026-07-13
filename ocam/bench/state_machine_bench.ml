@@ -56,22 +56,28 @@ let transfer id =
 ;;
 
 let () =
-  let operations = 10_000 in
-  let batch_size = 1_000 in
+  let operations = 30_000 in
+  let batch_size = 30 in
   let state = empty () in
   ignore (create_accounts state ~timestamp:1L [ account 1; account 2 ]);
+  let batches =
+    Array.init
+      (operations / batch_size)
+      (fun batch ->
+        let first_id = (batch * batch_size) + 10 in
+        List.init batch_size (fun offset -> transfer (first_id + offset)))
+  in
   Gc.full_major ();
   let gc_before = Gc.quick_stat () in
   let started = Unix.gettimeofday () in
-  for batch = 0 to (operations / batch_size) - 1 do
-    let first_id = (batch * batch_size) + 10 in
-    let requests = List.init batch_size (fun offset -> transfer (first_id + offset)) in
+  Array.iteri
+    (fun batch requests ->
     ignore
       (create_transfers
          state
          ~timestamp:(Int64.of_int ((batch * batch_size) + 3))
-         requests)
-  done;
+         requests))
+    batches;
   let elapsed = Unix.gettimeofday () -. started in
   let gc_after = Gc.quick_stat () in
   let allocated_words =
@@ -80,6 +86,7 @@ let () =
     -. gc_before.minor_words
     -. gc_before.major_words
   in
+  Printf.printf "implementation=ocaml\n";
   Printf.printf "operations=%d\n" operations;
   Printf.printf "batch_size=%d\n" batch_size;
   Printf.printf "operations_per_second=%.0f\n" (float operations /. elapsed);
