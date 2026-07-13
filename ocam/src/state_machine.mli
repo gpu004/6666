@@ -146,6 +146,7 @@ type create_transfer_status =
   | Transfer_timestamp_must_be_zero
   | Transfer_id_must_not_be_zero
   | Transfer_id_must_not_be_int_max
+  | Transfer_id_already_failed
   | Transfer_exists_with_different_request
   | Transfer_flags_are_mutually_exclusive
   | Transfer_debit_account_id_must_not_be_zero

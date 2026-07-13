@@ -11,7 +11,12 @@ zig=${ZIG:-"$repository_root/path/to/tigerbeetle/zig/zig"}
 
 (
   cd "$repository_root"
-  "$zig" test -O ReleaseSafe -target aarch64-macos.15.0 \
+  if [ -n "${ZIG_TARGET:-}" ]; then
+    set -- -target "$ZIG_TARGET"
+  else
+    set --
+  fi
+  "$zig" test -O ReleaseSafe "$@" \
     --dep stdx --dep test_options --dep vsr_options \
     -Mroot=tigerbeetle_state_machine_bench.zig \
     -Mstdx=path/to/tigerbeetle/src/stdx/stdx.zig \

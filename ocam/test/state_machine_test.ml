@@ -189,6 +189,16 @@ let test_open_linked_suffix () =
 ;;
 
 let test_timeout_validation_and_closing_expiry () =
+  let failed_id_state = empty () in
+  let failed = List.hd (create_transfers failed_id_state ~timestamp:1L [ transfer 10 ]) in
+  require
+    (failed.status = Transfer_debit_account_not_found)
+    "missing debit account should be transient";
+  ignore (create_accounts failed_id_state ~timestamp:2L [ account 1; account 2 ]);
+  require
+    ((List.hd (create_transfers failed_id_state ~timestamp:4L [ transfer 10 ])).status
+     = Transfer_id_already_failed)
+    "transiently failed transfer id should remain consumed";
   let overflow_state = empty () in
   ignore (create_accounts overflow_state ~timestamp:1L [ account 1; account 2 ]);
   let overflow =
@@ -232,7 +242,21 @@ let test_timeout_validation_and_closing_expiry () =
     "closing pending transfer should expire";
   require
     (not (account_of closing_state 1).flags.closed)
-    "expired closing pending transfer should reopen"
+    "expired closing pending transfer should reopen";
+  let unsigned_state = empty () in
+  ignore (create_accounts unsigned_state ~timestamp:1L [ account 1; account 2 ]);
+  let high_bit_timeout = Int32.min_int in
+  ignore
+    (create_transfers
+       unsigned_state
+       ~timestamp:3L
+       [ transfer ~flags:(transfer_flags ~pending:true ()) ~timeout:high_bit_timeout 10
+       ; transfer ~flags:(transfer_flags ~pending:true ()) ~timeout:high_bit_timeout 11
+       ]);
+  let expires_at = Int64.add 4L (Int64.mul 2_147_483_648L 1_000_000_000L) in
+  require
+    (expire_pending_transfers unsigned_state ~timestamp:expires_at = 2)
+    "unsigned high-bit timeouts should expire without skipping entries"
 ;;
 
 let test_post_pending_retry_and_balance_history () =
