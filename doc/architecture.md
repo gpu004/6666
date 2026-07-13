@@ -84,8 +84,9 @@ timestamp bounds. `timestamp_min = 0L` and `timestamp_max = 0L` mean no bound.
 Query results are ordered by stored timestamp ascending by default or descending
 with `reversed = true`, then truncated to `limit`. A non-positive `limit`
 returns no results. `get_account_transfers` additionally selects the debit
-and/or credit side, while `get_account_balances` only checks the current stored
-account against timestamp bounds.
+and/or credit side. For accounts created with the history flag,
+`get_account_balances` applies the transfer metadata, side, timestamp, ordering,
+and limit filters to per-transfer balance snapshots.
 
 ## Validation and evidence
 

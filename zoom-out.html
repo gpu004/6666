@@ -49,14 +49,14 @@
           <tr><td>Deterministic core</td><td><code>ocam/src/state_machine.ml</code></td><td>Implements accounting behavior and maintains the in-memory state.</td></tr>
           <tr><td>Scenario callers</td><td><code>ocam/test/state_machine_test.ml</code></td><td>Covers normal transfers, pending post/void, linked rollback, and validation precedence.</td></tr>
           <tr><td>Property callers</td><td><code>ocam/test/state_machine_property_test.ml</code></td><td>Checks determinism, conservation, idempotency, atomicity, lifecycle, ordering, and U128 boundaries.</td></tr>
-          <tr><td>Benchmark caller</td><td><code>ocam/bench/state_machine_bench.ml</code></td><td>Measures batched normal-transfer throughput, latency, and allocation.</td></tr>
+          <tr><td>Benchmark caller</td><td><code>ocam/bench/state_machine_bench.ml</code></td><td>Measures throughput, latency, and allocation for 30,000 prebuilt successful account creations.</td></tr>
           <tr><td>Dune wiring</td><td><code>ocam/src/dune</code>, <code>ocam/test/dune</code>, <code>ocam/bench/dune</code></td><td>Builds the library, tests, and benchmark.</td></tr>
           <tr><td>Behavior oracle</td><td><code>path/to/tigerbeetle/src/state_machine.zig</code></td><td>Upstream LSM/VSR-integrated state machine; not called by the OCaml core.</td></tr>
         </tbody>
       </table>
 
       <h2>Domain model</h2>
-      <p><code>State_machine.t</code> owns accounts and transfers keyed by U128 ID, pending-transfer status (<code>Pending</code>, <code>Posted</code>, <code>Voided</code>, or <code>Expired</code>), and the latest successful <code>commit_timestamp</code>. U128 arithmetic reports overflow or underflow rather than wrapping.</p>
+      <p><code>State_machine.t</code> owns accounts and transfers keyed by U128 ID, pending-transfer status (<code>Pending</code>, <code>Posted</code>, <code>Voided</code>, or <code>Expired</code>), balance history for history-enabled accounts, transiently failed transfer IDs, and the latest successful <code>commit_timestamp</code>. U128 arithmetic reports overflow or underflow rather than wrapping.</p>
       <table>
         <thead><tr><th>Debit side</th><th>Credit side</th></tr></thead>
         <tbody><tr><td><code>debits_pending</code></td><td><code>credits_pending</code></td></tr><tr><td><code>debits_posted</code></td><td><code>credits_posted</code></td></tr></tbody>
@@ -68,7 +68,7 @@
         <li><code>chains</code> groups adjacent <code>linked</code> requests.</li>
         <li>Unlinked requests execute directly; linked chains execute against cloned state.</li>
         <li>A successful chain replaces live state. On failure, the failing event keeps its status and all others become <code>*_linked_event_failed</code>.</li>
-        <li>An ending <code>linked</code> flag leaves an open chain and rejects the batch.</li>
+        <li>An ending <code>linked</code> flag rejects only the open suffix; complete prefix chains remain committed.</li>
       </ol>
       <p><code>create_account_one</code> validates account identity, initial balances, account constraints, idempotent retries, and timestamp semantics. <code>create_transfer_one</code> validates identity, accounts, ledger agreement, closure, balance constraints, timestamps, and arithmetic. <code>post_or_void</code> resolves a pending transfer; <code>expire_pending_transfers</code> expires timed-out transfers and removes their pending balances.</p>
 
@@ -79,12 +79,12 @@
           <tr><td><code>lookup_accounts</code>, <code>lookup_transfers</code></td><td>Return found records in requested ID order and omit unknown IDs.</td></tr>
           <tr><td><code>query_accounts</code>, <code>query_transfers</code></td><td>Filter, timestamp-sort, optionally reverse, then limit.</td></tr>
           <tr><td><code>get_account_transfers</code></td><td>Return debit-side and/or credit-side transfers for an account.</td></tr>
-          <tr><td><code>get_account_balances</code></td><td>Return the current matching account, not a historical snapshot.</td></tr>
+          <tr><td><code>get_account_balances</code></td><td>Return filtered per-transfer balance snapshots for a history-enabled account.</td></tr>
         </tbody>
       </table>
 
       <h2>Compatibility boundary</h2>
-      <p>The upstream Zig state machine is integrated with TigerBeetle’s LSM forest, VSR replication, and wire/storage structures. The OCaml core is not linked into that path. Remaining work includes a C ABI, 128-byte wire-compatible codecs, full differential testing, exact result-code encoding, CDC/history objects, and additional imported/query/expiry edge cases. The maintained scope is in <code>ocam/OCAML_REWRITE.md</code>.</p>
+      <p>The upstream Zig state machine is integrated with TigerBeetle’s LSM forest, VSR replication, and wire/storage structures. The OCaml core is not linked into that path. Remaining work includes a C ABI, 128-byte wire-compatible codecs, full differential testing, exact result-code encoding, CDC objects, and additional imported/query/expiry edge cases. The maintained scope is in <code>ocam/OCAML_REWRITE.md</code>.</p>
     </main>
   </body>
 </html>

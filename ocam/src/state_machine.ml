@@ -141,6 +141,7 @@ type create_transfer_status =
   | Transfer_timestamp_must_be_zero
   | Transfer_id_must_not_be_zero
   | Transfer_id_must_not_be_int_max
+  | Transfer_id_already_failed
   | Transfer_exists_with_different_request
   | Transfer_flags_are_mutually_exclusive
   | Transfer_debit_account_id_must_not_be_zero
@@ -219,6 +220,7 @@ type t =
   ; mutable transfers : transfer Id_table.t
   ; mutable pending : pending_status Id_table.t
   ; mutable account_history : (account * transfer) list Id_table.t
+  ; mutable failed_transfers : unit Id_table.t
   ; mutable commit_timestamp : int64
   }
 
@@ -227,6 +229,7 @@ let empty () =
   ; transfers = Id_table.create 1024
   ; pending = Id_table.create 256
   ; account_history = Id_table.create 1024
+  ; failed_transfers = Id_table.create 256
   ; commit_timestamp = 0L
   }
 ;;
@@ -241,6 +244,7 @@ let clone state =
   ; transfers = copy_table state.transfers
   ; pending = copy_table state.pending
   ; account_history = copy_table state.account_history
+  ; failed_transfers = copy_table state.failed_transfers
   ; commit_timestamp = state.commit_timestamp
   }
 ;;
@@ -250,6 +254,7 @@ let replace_state destination source =
   destination.transfers <- source.transfers;
   destination.pending <- source.pending;
   destination.account_history <- source.account_history;
+  destination.failed_transfers <- source.failed_transfers;
   destination.commit_timestamp <- source.commit_timestamp
 ;;
 
@@ -427,6 +432,8 @@ let timeout_ns timeout =
   Int64.mul (Int64.logand (Int64.of_int32 timeout) 0xffff_ffffL) 1_000_000_000L
 ;;
 
+let timeout_nonzero timeout = not (Int32.equal timeout 0l)
+
 let timeout_overflows ~timestamp ~timeout =
   let duration = timeout_ns timeout in
   Int64.compare timestamp (Int64.sub Int64.max_int duration) > 0
@@ -542,7 +549,7 @@ let post_or_void state ~timestamp_event (request : transfer) =
                 Int64.add pending_transfer.timestamp (timeout_ns pending_transfer.timeout)
               in
               if
-                Int32.compare pending_transfer.timeout 0l > 0
+                timeout_nonzero pending_transfer.timeout
                 && Int64.compare timestamp_event expires_at >= 0
               then error Transfer_pending_transfer_expired
               else (
@@ -649,7 +656,7 @@ let post_or_void state ~timestamp_event (request : transfer) =
                          { timestamp; status = Transfer_created })))))))
 ;;
 
-let create_transfer_one state ~timestamp_event (request : transfer) =
+let create_transfer_one_untracked state ~timestamp_event (request : transfer) =
   let error status = { timestamp = 0L; status } in
   if is_zero request.id
   then error Transfer_id_must_not_be_zero
@@ -761,6 +768,26 @@ let create_transfer_one state ~timestamp_event (request : transfer) =
                        then Id_table.add state.pending transfer.id Pending;
                        record_account_history state transfer debit credit;
                        { timestamp; status = Transfer_created }))))))
+;;
+
+let transfer_status_transient = function
+  | Transfer_debit_account_not_found
+  | Transfer_credit_account_not_found
+  | Transfer_pending_transfer_not_found
+  | Transfer_account_already_closed
+  | Transfer_exceeds_credits
+  | Transfer_exceeds_debits -> true
+  | _ -> false
+;;
+
+let create_transfer_one state ~timestamp_event (request : transfer) =
+  if Id_table.mem state.failed_transfers request.id
+  then { timestamp = 0L; status = Transfer_id_already_failed }
+  else (
+    let result = create_transfer_one_untracked state ~timestamp_event request in
+    if transfer_status_transient result.status
+    then Id_table.replace state.failed_transfers request.id ();
+    result)
 ;;
 
 let chains events linked =
@@ -1009,10 +1036,13 @@ let get_account_balances state (filter : account_filter) =
 
 let expire_pending_transfers state ~timestamp =
   let expired = ref 0 in
-  Id_table.iter
-    (fun id status ->
+  let pending_entries =
+    Id_table.fold (fun id status entries -> (id, status) :: entries) state.pending []
+  in
+  List.iter
+    (fun (id, status) ->
        match status, Id_table.find_opt state.transfers id with
-       | Pending, Some transfer when Int32.compare transfer.timeout 0l > 0 ->
+       | Pending, Some transfer when timeout_nonzero transfer.timeout ->
          let expires_at = Int64.add transfer.timestamp (timeout_ns transfer.timeout) in
          if Int64.compare expires_at timestamp <= 0
          then (
@@ -1048,7 +1078,7 @@ let expire_pending_transfers state ~timestamp =
              incr expired
            | _ -> failwith "pending-balance invariant violated")
        | _ -> ())
-    state.pending;
+    pending_entries;
   if !expired > 0 then state.commit_timestamp <- timestamp;
   !expired
 ;;

@@ -37,7 +37,7 @@ flowchart TD
 | Deterministic core | `ocam/src/state_machine.ml` | Implements all accounting behavior and maintains the in-memory state. |
 | Scenario callers | `ocam/test/state_machine_test.ml` | Covers single-phase transfers, pending post/void, linked rollback, and validation precedence. |
 | Property callers | `ocam/test/state_machine_property_test.ml` | Checks determinism, balance conservation, idempotency, linked atomicity, pending lifecycle, query ordering, and `U128` boundaries. |
-| Benchmark caller | `ocam/bench/state_machine_bench.ml` | Applies batches of normal transfers and reports throughput, latency, and allocation. |
+| Benchmark caller | `ocam/bench/state_machine_bench.ml` | Applies 30,000 prebuilt successful account creations and reports throughput, latency, and allocation. |
 | Dune wiring | `ocam/src/dune`, `ocam/test/dune`, `ocam/bench/dune` | Builds the library, tests, and benchmark. |
 | Behavior oracle | `path/to/tigerbeetle/src/state_machine.zig` | The upstream state machine coupled to TigerBeetle’s LSM, VSR, and wire-level components. It is not called by the OCaml core. |
 
@@ -46,11 +46,13 @@ builds only the OCaml library and its test/benchmark consumers.
 
 ## Domain model
 
-`State_machine.t` owns four mutable pieces of state:
+`State_machine.t` owns the ledger's mutable state:
 
 - accounts, keyed by `U128` account ID;
 - transfers, keyed by `U128` transfer ID;
-- pending-transfer status: `Pending`, `Posted`, `Voided`, or `Expired`; and
+- pending-transfer status: `Pending`, `Posted`, `Voided`, or `Expired`;
+- per-transfer balance history for history-enabled accounts;
+- transfer IDs consumed by transient failures; and
 - the most recent successful `commit_timestamp`.
 
 `U128` is an explicit unsigned 128-bit value used for account/transfer IDs and
@@ -78,8 +80,8 @@ and credits remain equal for both balance classes.
 3. On success, `replace_state` commits the clone. On any failure, the failed
    request retains its status and every other event in the chain becomes
    `*_linked_event_failed`.
-4. A final `linked` request leaves an open chain and the whole supplied batch
-   is rejected with `*_linked_event_chain_open` on its last request.
+4. A final `linked` request leaves an open chain; complete prefix chains still
+   commit, while only the open suffix is rejected.
 
 ### Account creation
 
@@ -109,7 +111,7 @@ the pending balances and prevents later post or void requests.
 | `lookup_accounts`, `lookup_transfers` | Return found records in requested ID order; omit unknown IDs. |
 | `query_accounts`, `query_transfers` | Filter metadata, ledger, code, and timestamp; sort by timestamp; reverse if requested; apply the limit. |
 | `get_account_transfers` | Return debit-side and/or credit-side transfers for one account. |
-| `get_account_balances` | Return the current account record when it satisfies timestamp bounds; it is not a historical snapshot query. |
+| `get_account_balances` | Return filtered per-transfer balance snapshots for a history-enabled account. |
 
 ## Compatibility boundary
 
@@ -117,5 +119,5 @@ The upstream Zig state machine uses explicit wire/storage structures and is
 integrated with the LSM forest and VSR replication. The OCaml core is not yet
 linked into that path. Remaining integration work includes a C ABI,
 wire-compatible 128-byte codecs, a complete differential corpus, exact result
-code encoding, CDC/history objects, and further imported/query/expiry edge
+code encoding, CDC objects, and further imported/query/expiry edge
 cases. See `ocam/OCAML_REWRITE.md` for the maintained compatibility scope.
