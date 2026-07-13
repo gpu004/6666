@@ -562,27 +562,25 @@ let post_or_void state ~timestamp_event (request : transfer) =
               && not (U128.equal amount pending_transfer.amount)
             then error Transfer_pending_transfer_has_different_amount
             else (
-              match
-                validate_event_timestamp
-                  ~commit_timestamp:state.commit_timestamp
-                  ~timestamp_event
-                  ~imported:flags.imported
-                  ~timestamp:request.timestamp
-              with
-              | Error `Must_be_zero -> error Transfer_timestamp_must_be_zero
-              | Error `Out_of_range -> error Transfer_imported_timestamp_out_of_range
-              | Error `Regressed -> error Transfer_imported_timestamp_must_not_regress
-              | Ok timestamp ->
-                let expires_at =
-                  Int64.add
-                    pending_transfer.timestamp
-                    (timeout_ns pending_transfer.timeout)
-                in
-                if
-                  timeout_nonzero pending_transfer.timeout
-                  && Int64.compare timestamp expires_at >= 0
-                then error Transfer_pending_transfer_expired
-                else (
+              let expires_at =
+                Int64.add pending_transfer.timestamp (timeout_ns pending_transfer.timeout)
+              in
+              if
+                timeout_nonzero pending_transfer.timeout
+                && Int64.compare timestamp_event expires_at >= 0
+              then error Transfer_pending_transfer_expired
+              else (
+                match
+                  validate_event_timestamp
+                    ~commit_timestamp:state.commit_timestamp
+                    ~timestamp_event
+                    ~imported:flags.imported
+                    ~timestamp:request.timestamp
+                with
+                | Error `Must_be_zero -> error Transfer_timestamp_must_be_zero
+                | Error `Out_of_range -> error Transfer_imported_timestamp_out_of_range
+                | Error `Regressed -> error Transfer_imported_timestamp_must_not_regress
+                | Ok timestamp ->
                   let debit =
                     Id_table.find state.accounts pending_transfer.debit_account_id
                   in

@@ -38,4 +38,4 @@ modes.
 | Implementation | Operations/s | Mean batch latency (ms) | Allocation |
 | --- | ---: | ---: | --- |
 | TigerBeetle Zig | blocked | blocked | The standalone fixture needs TigerBeetle's internal commit sequencing completed before it can produce a valid run. |
-| OCaml | 1,294,725 | 0.023 | 5,767,131 words total; 192.24 words/op |
+| OCaml | 1,250,115 | 0.024 | 5,767,131 words total; 192.24 words/op |

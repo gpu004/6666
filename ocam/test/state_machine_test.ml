@@ -146,8 +146,8 @@ let test_pending_post_and_void () =
     ((List.hd
         (create_transfers imported_state ~timestamp:2_000_000_003L [ imported_post ]))
        .status
-     = Transfer_created)
-    "imported post should compare expiry against its imported timestamp"
+     = Transfer_pending_transfer_expired)
+    "pending expiry should use the assigned event timestamp"
 ;;
 
 let test_linked_rollback () =
