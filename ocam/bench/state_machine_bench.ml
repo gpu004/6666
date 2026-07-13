@@ -58,6 +58,11 @@ let transfer id =
 let () =
   let operations = 30_000 in
   let batch_size = 30 in
+  let sanity_state = empty () in
+  ignore (create_accounts sanity_state ~timestamp:1L [ account 1; account 2 ]);
+  (match create_transfers sanity_state ~timestamp:3L [ transfer 10 ] with
+   | [ { status = Transfer_created; _ } ] -> ()
+   | _ -> failwith "benchmark workload sanity check failed");
   let state = empty () in
   ignore (create_accounts state ~timestamp:1L [ account 1; account 2 ]);
   let batches =

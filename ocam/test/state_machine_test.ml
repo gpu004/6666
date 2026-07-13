@@ -127,7 +127,27 @@ let test_pending_post_and_void () =
   in
   let void_result = List.hd (create_transfers state ~timestamp:6L [ void ]) in
   require (void_result.status = Transfer_created) "void should be created";
-  require_u128 0 (account_of state 1).debits_pending "void should clear pending debit"
+  require_u128 0 (account_of state 1).debits_pending "void should clear pending debit";
+  let imported_state = empty () in
+  ignore (create_accounts imported_state ~timestamp:1L [ account 1; account 2 ]);
+  ignore
+    (create_transfers
+       imported_state
+       ~timestamp:3L
+       [ transfer ~flags:(transfer_flags ~pending:true ()) ~timeout:1l 40 ]);
+  let imported_post =
+    transfer
+      ~flags:(transfer_flags ~post_pending_transfer:true ~imported:true ())
+      ~pending_id:(u128 40)
+      ~timestamp:500_000_003L
+      41
+  in
+  require
+    ((List.hd
+        (create_transfers imported_state ~timestamp:2_000_000_003L [ imported_post ]))
+       .status
+     = Transfer_created)
+    "imported post should compare expiry against its imported timestamp"
 ;;
 
 let test_linked_rollback () =
@@ -261,6 +281,17 @@ let test_batch_compatibility_and_linked_failure_ids () =
     (List.map (fun result -> result.status) account_results
      = [ Account_created; Account_imported_event_not_expected ])
     "account batch should use the first event's imported mode";
+  let imported_batch_state = empty () in
+  let imported id timestamp =
+    let request = account id in
+    { request with flags = { request.flags with imported = true }; timestamp }
+  in
+  let imported_batch_results =
+    create_accounts imported_batch_state ~timestamp:10L [ imported 1 10L; imported 2 10L ]
+  in
+  require
+    ((List.hd imported_batch_results).status = Account_created)
+    "imported timestamp equal to its event cursor may precede the batch high timestamp";
   let imported_transfer =
     { (transfer ~flags:(transfer_flags ~imported:true ()) ~timestamp:4L 21) with
       debit_account_id = u128 1
@@ -275,6 +306,21 @@ let test_batch_compatibility_and_linked_failure_ids () =
     (List.map (fun result -> result.status) transfer_results
      = [ Transfer_created; Transfer_imported_event_not_expected ])
     "transfer batch should use the first event's imported mode";
+  let regression_state = empty () in
+  let constrained = account 1 in
+  let constrained =
+    { constrained with
+      flags = { constrained.flags with debits_must_not_exceed_credits = true }
+    }
+  in
+  ignore (create_accounts regression_state ~timestamp:1L [ constrained; account 2 ]);
+  let regressed =
+    transfer ~flags:(transfer_flags ~imported:true ()) ~timestamp:2L ~amount:1 22
+  in
+  require
+    ((List.hd (create_transfers regression_state ~timestamp:4L [ regressed ])).status
+     = Transfer_imported_timestamp_must_not_regress)
+    "imported regression should precede account balance constraints";
   let imported_storage = empty () in
   let imported_request =
     let request = account 1 in

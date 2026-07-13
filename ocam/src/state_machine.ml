@@ -562,25 +562,27 @@ let post_or_void state ~timestamp_event (request : transfer) =
               && not (U128.equal amount pending_transfer.amount)
             then error Transfer_pending_transfer_has_different_amount
             else (
-              let expires_at =
-                Int64.add pending_transfer.timestamp (timeout_ns pending_transfer.timeout)
-              in
-              if
-                timeout_nonzero pending_transfer.timeout
-                && Int64.compare timestamp_event expires_at >= 0
-              then error Transfer_pending_transfer_expired
-              else (
-                match
-                  validate_event_timestamp
-                    ~commit_timestamp:state.commit_timestamp
-                    ~timestamp_event
-                    ~imported:flags.imported
-                    ~timestamp:request.timestamp
-                with
-                | Error `Must_be_zero -> error Transfer_timestamp_must_be_zero
-                | Error `Out_of_range -> error Transfer_imported_timestamp_out_of_range
-                | Error `Regressed -> error Transfer_imported_timestamp_must_not_regress
-                | Ok timestamp ->
+              match
+                validate_event_timestamp
+                  ~commit_timestamp:state.commit_timestamp
+                  ~timestamp_event
+                  ~imported:flags.imported
+                  ~timestamp:request.timestamp
+              with
+              | Error `Must_be_zero -> error Transfer_timestamp_must_be_zero
+              | Error `Out_of_range -> error Transfer_imported_timestamp_out_of_range
+              | Error `Regressed -> error Transfer_imported_timestamp_must_not_regress
+              | Ok timestamp ->
+                let expires_at =
+                  Int64.add
+                    pending_transfer.timestamp
+                    (timeout_ns pending_transfer.timeout)
+                in
+                if
+                  timeout_nonzero pending_transfer.timeout
+                  && Int64.compare timestamp expires_at >= 0
+                then error Transfer_pending_transfer_expired
+                else (
                   let debit =
                     Id_table.find state.accounts pending_transfer.debit_account_id
                   in
@@ -721,90 +723,91 @@ let create_transfer_one_untracked state ~timestamp_event (request : transfer) =
              then error Transfer_accounts_must_have_same_ledger
              else if not (Int32.equal request.ledger debit.ledger)
              then error Transfer_must_have_same_ledger_as_accounts
+             else if
+               request.flags.imported
+               && Int64.compare request.timestamp state.commit_timestamp <= 0
+             then error Transfer_imported_timestamp_must_not_regress
+             else if request.flags.imported && not (Int32.equal request.timeout 0l)
+             then error Transfer_imported_timeout_must_be_zero
              else if debit.flags.closed || credit.flags.closed
              then error Transfer_account_already_closed
              else (
                let amount = effective_balancing_amount request debit credit in
-               if debits_exceed_credits debit amount
-               then error Transfer_exceeds_credits
-               else if credits_exceed_debits credit amount
-               then error Transfer_exceeds_debits
-               else (
-                 match
-                   validate_event_timestamp
-                     ~commit_timestamp:state.commit_timestamp
-                     ~timestamp_event
-                     ~imported:request.flags.imported
-                     ~timestamp:request.timestamp
-                 with
-                 | Error `Must_be_zero -> error Transfer_timestamp_must_be_zero
-                 | Error `Out_of_range -> error Transfer_imported_timestamp_out_of_range
-                 | Error `Regressed -> error Transfer_imported_timestamp_must_not_regress
-                 | Ok timestamp ->
-                   if request.flags.imported && not (Int32.equal request.timeout 0l)
-                   then error Transfer_imported_timeout_must_be_zero
-                   else if
-                     request.flags.pending
-                     && timeout_overflows ~timestamp ~timeout:request.timeout
-                   then error Transfer_overflows_timeout
-                   else (
-                     let debit_balance =
-                       if request.flags.pending
-                       then sum_or_error debit.debits_pending amount
-                       else sum_or_error debit.debits_posted amount
-                     in
-                     let credit_balance =
-                       if request.flags.pending
-                       then sum_or_error credit.credits_pending amount
-                       else sum_or_error credit.credits_posted amount
-                     in
-                     match debit_balance, credit_balance with
-                     | Error _, _ | _, Error _ -> error Transfer_overflows_balance
-                     | Ok debit_balance, Ok credit_balance ->
-                       let debits_pending, debits_posted =
-                         if request.flags.pending
-                         then debit_balance, debit.debits_posted
-                         else debit.debits_pending, debit_balance
-                       in
-                       let credits_pending, credits_posted =
-                         if request.flags.pending
-                         then credit_balance, credit.credits_posted
-                         else credit.credits_pending, credit_balance
-                       in
-                       if
-                         total_balance_overflows debits_pending debits_posted
-                         || total_balance_overflows credits_pending credits_posted
-                       then error Transfer_overflows_balance
-                       else (
-                         let debit =
-                           if request.flags.pending
-                           then { debit with debits_pending = debit_balance }
-                           else { debit with debits_posted = debit_balance }
-                         in
-                         let credit =
-                           if request.flags.pending
-                           then { credit with credits_pending = credit_balance }
-                           else { credit with credits_posted = credit_balance }
-                         in
-                         let debit =
-                           if request.flags.closing_debit
-                           then { debit with flags = { debit.flags with closed = true } }
-                           else debit
-                         in
-                         let credit =
-                           if request.flags.closing_credit
-                           then
-                             { credit with flags = { credit.flags with closed = true } }
-                           else credit
-                         in
-                         Id_table.replace state.accounts debit.id debit;
-                         Id_table.replace state.accounts credit.id credit;
-                         let transfer = { request with amount; timestamp } in
-                         store_transfer state transfer;
-                         if request.flags.pending
-                         then Id_table.add state.pending transfer.id Pending;
-                         record_account_history state transfer debit credit;
-                         { timestamp; status = Transfer_created })))))))
+               match
+                 validate_event_timestamp
+                   ~commit_timestamp:state.commit_timestamp
+                   ~timestamp_event
+                   ~imported:request.flags.imported
+                   ~timestamp:request.timestamp
+               with
+               | Error `Must_be_zero -> error Transfer_timestamp_must_be_zero
+               | Error `Out_of_range -> error Transfer_imported_timestamp_out_of_range
+               | Error `Regressed -> error Transfer_imported_timestamp_must_not_regress
+               | Ok timestamp ->
+                 let debit_balance =
+                   if request.flags.pending
+                   then sum_or_error debit.debits_pending amount
+                   else sum_or_error debit.debits_posted amount
+                 in
+                 let credit_balance =
+                   if request.flags.pending
+                   then sum_or_error credit.credits_pending amount
+                   else sum_or_error credit.credits_posted amount
+                 in
+                 (match debit_balance, credit_balance with
+                  | Error _, _ | _, Error _ -> error Transfer_overflows_balance
+                  | Ok debit_balance, Ok credit_balance ->
+                    let debits_pending, debits_posted =
+                      if request.flags.pending
+                      then debit_balance, debit.debits_posted
+                      else debit.debits_pending, debit_balance
+                    in
+                    let credits_pending, credits_posted =
+                      if request.flags.pending
+                      then credit_balance, credit.credits_posted
+                      else credit.credits_pending, credit_balance
+                    in
+                    if
+                      total_balance_overflows debits_pending debits_posted
+                      || total_balance_overflows credits_pending credits_posted
+                    then error Transfer_overflows_balance
+                    else if
+                      request.flags.pending
+                      && timeout_overflows ~timestamp ~timeout:request.timeout
+                    then error Transfer_overflows_timeout
+                    else if debits_exceed_credits debit amount
+                    then error Transfer_exceeds_credits
+                    else if credits_exceed_debits credit amount
+                    then error Transfer_exceeds_debits
+                    else (
+                      let debit =
+                        if request.flags.pending
+                        then { debit with debits_pending = debit_balance }
+                        else { debit with debits_posted = debit_balance }
+                      in
+                      let credit =
+                        if request.flags.pending
+                        then { credit with credits_pending = credit_balance }
+                        else { credit with credits_posted = credit_balance }
+                      in
+                      let debit =
+                        if request.flags.closing_debit
+                        then { debit with flags = { debit.flags with closed = true } }
+                        else debit
+                      in
+                      let credit =
+                        if request.flags.closing_credit
+                        then { credit with flags = { credit.flags with closed = true } }
+                        else credit
+                      in
+                      Id_table.replace state.accounts debit.id debit;
+                      Id_table.replace state.accounts credit.id credit;
+                      let transfer = { request with amount; timestamp } in
+                      store_transfer state transfer;
+                      if request.flags.pending
+                      then Id_table.add state.pending transfer.id Pending;
+                      record_account_history state transfer debit credit;
+                      { timestamp; status = Transfer_created }))))))
 ;;
 
 let transfer_status_transient = function
@@ -841,6 +844,9 @@ let chains events linked =
 
 let create_accounts state ~timestamp (requests : account list) =
   let timestamp_cursor = ref timestamp in
+  let batch_timestamp_high =
+    Int64.add timestamp (Int64.of_int (Int.max 0 (List.length requests - 1)))
+  in
   let batch_imported =
     match requests with
     | [] -> false
@@ -858,7 +864,7 @@ let create_accounts state ~timestamp (requests : account list) =
     else if request.flags.imported && Int64.compare request.timestamp 0L <= 0
     then { timestamp = 0L; status = Account_imported_timestamp_out_of_range }
     else if
-      request.flags.imported && Int64.compare request.timestamp !timestamp_cursor >= 0
+      request.flags.imported && Int64.compare request.timestamp batch_timestamp_high >= 0
     then { timestamp = 0L; status = Account_imported_timestamp_must_not_advance }
     else if (not request.flags.imported) && not (Int64.equal request.timestamp 0L)
     then { timestamp = 0L; status = Account_timestamp_must_be_zero }
@@ -925,6 +931,9 @@ let create_accounts state ~timestamp (requests : account list) =
 
 let create_transfers state ~timestamp (requests : transfer list) =
   let timestamp_cursor = ref timestamp in
+  let batch_timestamp_high =
+    Int64.add timestamp (Int64.of_int (Int.max 0 (List.length requests - 1)))
+  in
   let batch_imported =
     match requests with
     | [] -> false
@@ -942,7 +951,7 @@ let create_transfers state ~timestamp (requests : transfer list) =
     else if request.flags.imported && Int64.compare request.timestamp 0L <= 0
     then { timestamp = 0L; status = Transfer_imported_timestamp_out_of_range }
     else if
-      request.flags.imported && Int64.compare request.timestamp !timestamp_cursor >= 0
+      request.flags.imported && Int64.compare request.timestamp batch_timestamp_high >= 0
     then { timestamp = 0L; status = Transfer_imported_timestamp_must_not_advance }
     else if (not request.flags.imported) && not (Int64.equal request.timestamp 0L)
     then { timestamp = 0L; status = Transfer_timestamp_must_be_zero }
