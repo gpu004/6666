@@ -1,4 +1,0 @@
-[submodule "repo"]
-	path = repo
-	url = https://github.com/tigerbeetle/tigerbeetle
-	branch = main
