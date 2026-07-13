@@ -16,19 +16,35 @@ reference; do not treat this repository as a replacement TigerBeetle server.
   workload, the latest local OCaml result, and the current native-baseline
   blocker.
 
-The intended toolchain is the Jane Street/OxCaml ecosystem. The current core
-is synchronous and keeps its state and wire/storage representations explicit;
-Async belongs at an integration boundary rather than in the ledger logic.
+The build and CI use the pinned OxCaml compiler, Jane Street Base, and the
+matching OxCaml-compatible formatter. The current core is synchronous and
+keeps its state and wire/storage representations explicit; Async belongs at an
+integration boundary rather than in the ledger logic.
 
 ## Build, test, and benchmark
 
 From `ocam/`:
 
 ```sh
+opam switch create tigerbeetle-oxcaml oxcaml-compiler.5.2.0minus31 \
+  --repos ox=git+https://github.com/oxcaml/opam-repository.git,default
+eval "$(opam env --switch tigerbeetle-oxcaml)"
 opam install . --deps-only --with-test
 opam exec -- dune build
 opam exec -- dune runtest
 opam exec -- dune build @bench
+```
+
+The project requires the OxCaml opam overlay; `oxcaml` in
+`ocam/dune-project` makes a standard OCaml switch fail dependency resolution
+instead of silently compiling the project with a different toolchain. CI uses
+the same pinned OxCaml compiler. The formatting check uses the matching
+OxCaml-compatible formatter:
+
+```sh
+opam install ocamlformat.0.26.2+ox1
+find . -name _build -prune -o \( -name '*.ml' -o -name '*.mli' \) -print0 \
+  | xargs -0 opam exec -- ocamlformat --check
 ```
 
 The OCaml benchmark reports operations per second, per-batch latency, and

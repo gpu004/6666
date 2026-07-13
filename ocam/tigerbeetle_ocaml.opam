@@ -3,7 +3,8 @@ opam-version: "2.0"
 synopsis: "OCaml ledger state machine for the pinned TigerBeetle source tree"
 depends: [
   "dune" {>= "3.11"}
-  "ocaml" {>= "5.1"}
+  "ocaml" {>= "5.2"}
+  "oxcaml"
   "base"
   "qcheck" {with-test}
   "odoc" {with-doc}
