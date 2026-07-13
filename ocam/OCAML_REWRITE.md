@@ -37,5 +37,5 @@ linked rollback. The Dune suite also runs deterministic QCheck properties for
 execution, conservation, idempotency, linked atomicity, pending resolution,
 lookup/query ordering, and public U128 boundaries. Full differential
 equivalence still requires the entire Zig test corpus, exact numeric result-code
-encoding, CDC/history objects, imported edge cases, query validation, expiry
+encoding, CDC objects, additional imported edge cases, query validation, expiry
 batching, and deprecated operations.

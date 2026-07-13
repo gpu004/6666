@@ -174,6 +174,7 @@ type create_transfer_status =
   | Transfer_exceeds_debits
   | Transfer_imported_timestamp_out_of_range
   | Transfer_imported_timestamp_must_not_regress
+  | Transfer_imported_timeout_must_be_zero
 
 type 'status create_result =
   { timestamp : int64
@@ -217,6 +218,7 @@ type t =
   { mutable accounts : account Id_table.t
   ; mutable transfers : transfer Id_table.t
   ; mutable pending : pending_status Id_table.t
+  ; mutable account_history : (account * transfer) list Id_table.t
   ; mutable commit_timestamp : int64
   }
 
@@ -224,6 +226,7 @@ let empty () =
   { accounts = Id_table.create 1024
   ; transfers = Id_table.create 1024
   ; pending = Id_table.create 256
+  ; account_history = Id_table.create 1024
   ; commit_timestamp = 0L
   }
 ;;
@@ -237,6 +240,7 @@ let clone state =
   { accounts = copy_table state.accounts
   ; transfers = copy_table state.transfers
   ; pending = copy_table state.pending
+  ; account_history = copy_table state.account_history
   ; commit_timestamp = state.commit_timestamp
   }
 ;;
@@ -245,6 +249,7 @@ let replace_state destination source =
   destination.accounts <- source.accounts;
   destination.transfers <- source.transfers;
   destination.pending <- source.pending;
+  destination.account_history <- source.account_history;
   destination.commit_timestamp <- source.commit_timestamp
 ;;
 
@@ -355,20 +360,90 @@ let credits_exceed_debits (account : account) amount =
        | Ok after -> U128.compare after account.debits_posted > 0))
 ;;
 
-let transfer_request_equal (request : transfer) (existing : transfer) =
+let transfer_request_equal state (request : transfer) (existing : transfer) =
+  let pending =
+    if request.flags.post_pending_transfer || request.flags.void_pending_transfer
+    then Id_table.find_opt state.transfers existing.pending_id
+    else None
+  in
+  let optional_u128 request_value existing_value pending_value =
+    if is_zero request_value
+    then U128.equal existing_value pending_value
+    else U128.equal request_value existing_value
+  in
+  let optional_int64 request_value existing_value pending_value =
+    if Int64.equal request_value 0L
+    then Int64.equal existing_value pending_value
+    else Int64.equal request_value existing_value
+  in
+  let optional_int32 request_value existing_value pending_value =
+    if Int32.equal request_value 0l
+    then Int32.equal existing_value pending_value
+    else Int32.equal request_value existing_value
+  in
+  let amount_equal =
+    match pending with
+    | Some pending when request.flags.post_pending_transfer ->
+      if is_max request.amount
+      then U128.equal existing.amount pending.amount
+      else U128.equal request.amount existing.amount
+    | Some pending when request.flags.void_pending_transfer ->
+      if is_zero request.amount
+      then U128.equal existing.amount pending.amount
+      else U128.equal request.amount existing.amount
+    | _ when request.flags.balancing_debit || request.flags.balancing_credit ->
+      U128.compare request.amount existing.amount >= 0
+    | _ -> U128.equal request.amount existing.amount
+  in
   transfer_flags_equal request.flags existing.flags
-  && U128.equal request.debit_account_id existing.debit_account_id
-  && U128.equal request.credit_account_id existing.credit_account_id
+  && (match pending with
+      | Some pending ->
+        (is_zero request.debit_account_id
+         || U128.equal request.debit_account_id existing.debit_account_id)
+        && (is_zero request.credit_account_id
+            || U128.equal request.credit_account_id existing.credit_account_id)
+        && optional_u128
+             request.user_data_128
+             existing.user_data_128
+             pending.user_data_128
+        && optional_int64 request.user_data_64 existing.user_data_64 pending.user_data_64
+        && optional_int32 request.user_data_32 existing.user_data_32 pending.user_data_32
+        && (Int32.equal request.ledger 0l || Int32.equal request.ledger existing.ledger)
+        && (request.code = 0 || request.code = existing.code)
+      | None ->
+        U128.equal request.debit_account_id existing.debit_account_id
+        && U128.equal request.credit_account_id existing.credit_account_id
+        && U128.equal request.user_data_128 existing.user_data_128
+        && Int64.equal request.user_data_64 existing.user_data_64
+        && Int32.equal request.user_data_32 existing.user_data_32
+        && Int32.equal request.ledger existing.ledger
+        && request.code = existing.code)
   && U128.equal request.pending_id existing.pending_id
   && Int32.equal request.timeout existing.timeout
-  && (if request.flags.balancing_debit || request.flags.balancing_credit
-      then U128.compare request.amount existing.amount >= 0
-      else U128.equal request.amount existing.amount)
-  && U128.equal request.user_data_128 existing.user_data_128
-  && Int64.equal request.user_data_64 existing.user_data_64
-  && Int32.equal request.user_data_32 existing.user_data_32
-  && Int32.equal request.ledger existing.ledger
-  && request.code = existing.code
+  && amount_equal
+;;
+
+let timeout_ns timeout =
+  Int64.mul (Int64.logand (Int64.of_int32 timeout) 0xffff_ffffL) 1_000_000_000L
+;;
+
+let timeout_overflows ~timestamp ~timeout =
+  let duration = timeout_ns timeout in
+  Int64.compare timestamp (Int64.sub Int64.max_int duration) > 0
+;;
+
+let record_account_history state (transfer : transfer) debit credit =
+  let record (account : account) =
+    if account.flags.history
+    then (
+      let snapshot = { account with timestamp = transfer.timestamp } in
+      let history =
+        Option.value (Id_table.find_opt state.account_history account.id) ~default:[]
+      in
+      Id_table.replace state.account_history account.id ((snapshot, transfer) :: history))
+  in
+  record debit;
+  record credit
 ;;
 
 let effective_balancing_amount (request : transfer) (debit : account) (credit : account) =
@@ -464,9 +539,7 @@ let post_or_void state ~timestamp_event (request : transfer) =
             then error Transfer_pending_transfer_has_different_amount
             else (
               let expires_at =
-                Int64.add
-                  pending_transfer.timestamp
-                  (Int64.mul (Int64.of_int32 pending_transfer.timeout) 1_000_000_000L)
+                Int64.add pending_transfer.timestamp (timeout_ns pending_transfer.timeout)
               in
               if
                 Int32.compare pending_transfer.timeout 0l > 0
@@ -550,12 +623,29 @@ let post_or_void state ~timestamp_event (request : transfer) =
                              debit_account_id = pending_transfer.debit_account_id
                            ; credit_account_id = pending_transfer.credit_account_id
                            ; amount
+                           ; user_data_128 =
+                               (if is_zero request.user_data_128
+                                then pending_transfer.user_data_128
+                                else request.user_data_128)
+                           ; user_data_64 =
+                               (if Int64.equal request.user_data_64 0L
+                                then pending_transfer.user_data_64
+                                else request.user_data_64)
+                           ; user_data_32 =
+                               (if Int32.equal request.user_data_32 0l
+                                then pending_transfer.user_data_32
+                                else request.user_data_32)
                            ; ledger = pending_transfer.ledger
                            ; code = pending_transfer.code
                            ; timestamp
                            }
                          in
                          store_transfer state transfer;
+                         record_account_history
+                           state
+                           transfer
+                           (Id_table.find state.accounts debit.id)
+                           (Id_table.find state.accounts credit.id);
                          { timestamp; status = Transfer_created })))))))
 ;;
 
@@ -568,7 +658,7 @@ let create_transfer_one state ~timestamp_event (request : transfer) =
   else (
     match Id_table.find_opt state.transfers request.id with
     | Some existing ->
-      if transfer_request_equal request existing
+      if transfer_request_equal state request existing
       then { timestamp = existing.timestamp; status = Transfer_exists }
       else error Transfer_exists_with_different_request
     | None ->
@@ -623,46 +713,54 @@ let create_transfer_one state ~timestamp_event (request : transfer) =
                  | Error `Out_of_range -> error Transfer_imported_timestamp_out_of_range
                  | Error `Regressed -> error Transfer_imported_timestamp_must_not_regress
                  | Ok timestamp ->
-                   let debit_balance =
-                     if request.flags.pending
-                     then sum_or_error debit.debits_pending amount
-                     else sum_or_error debit.debits_posted amount
-                   in
-                   let credit_balance =
-                     if request.flags.pending
-                     then sum_or_error credit.credits_pending amount
-                     else sum_or_error credit.credits_posted amount
-                   in
-                   (match debit_balance, credit_balance with
-                    | Error _, _ | _, Error _ -> error Transfer_overflows_balance
-                    | Ok debit_balance, Ok credit_balance ->
-                      let debit =
-                        if request.flags.pending
-                        then { debit with debits_pending = debit_balance }
-                        else { debit with debits_posted = debit_balance }
-                      in
-                      let credit =
-                        if request.flags.pending
-                        then { credit with credits_pending = credit_balance }
-                        else { credit with credits_posted = credit_balance }
-                      in
-                      let debit =
-                        if request.flags.closing_debit
-                        then { debit with flags = { debit.flags with closed = true } }
-                        else debit
-                      in
-                      let credit =
-                        if request.flags.closing_credit
-                        then { credit with flags = { credit.flags with closed = true } }
-                        else credit
-                      in
-                      Id_table.replace state.accounts debit.id debit;
-                      Id_table.replace state.accounts credit.id credit;
-                      let transfer = { request with amount; timestamp } in
-                      store_transfer state transfer;
-                      if request.flags.pending
-                      then Id_table.add state.pending transfer.id Pending;
-                      { timestamp; status = Transfer_created }))))))
+                   if request.flags.imported && not (Int32.equal request.timeout 0l)
+                   then error Transfer_imported_timeout_must_be_zero
+                   else if
+                     request.flags.pending
+                     && timeout_overflows ~timestamp ~timeout:request.timeout
+                   then error Transfer_overflows_timeout
+                   else (
+                     let debit_balance =
+                       if request.flags.pending
+                       then sum_or_error debit.debits_pending amount
+                       else sum_or_error debit.debits_posted amount
+                     in
+                     let credit_balance =
+                       if request.flags.pending
+                       then sum_or_error credit.credits_pending amount
+                       else sum_or_error credit.credits_posted amount
+                     in
+                     match debit_balance, credit_balance with
+                     | Error _, _ | _, Error _ -> error Transfer_overflows_balance
+                     | Ok debit_balance, Ok credit_balance ->
+                       let debit =
+                         if request.flags.pending
+                         then { debit with debits_pending = debit_balance }
+                         else { debit with debits_posted = debit_balance }
+                       in
+                       let credit =
+                         if request.flags.pending
+                         then { credit with credits_pending = credit_balance }
+                         else { credit with credits_posted = credit_balance }
+                       in
+                       let debit =
+                         if request.flags.closing_debit
+                         then { debit with flags = { debit.flags with closed = true } }
+                         else debit
+                       in
+                       let credit =
+                         if request.flags.closing_credit
+                         then { credit with flags = { credit.flags with closed = true } }
+                         else credit
+                       in
+                       Id_table.replace state.accounts debit.id debit;
+                       Id_table.replace state.accounts credit.id credit;
+                       let transfer = { request with amount; timestamp } in
+                       store_transfer state transfer;
+                       if request.flags.pending
+                       then Id_table.add state.pending transfer.id Pending;
+                       record_account_history state transfer debit credit;
+                       { timestamp; status = Transfer_created }))))))
 ;;
 
 let chains events linked =
@@ -709,21 +807,27 @@ let create_accounts state ~timestamp (requests : account list) =
               else { timestamp = 0L; status = Account_linked_event_failed })
            results)
   in
-  if requests <> [] && (List.hd (List.rev requests)).flags.linked
-  then
-    List.mapi
-      (fun index _ ->
-         { timestamp = 0L
-         ; status =
-             (if index = List.length requests - 1
-              then Account_linked_event_chain_open
-              else Account_linked_event_failed)
-         })
-      requests
-  else
-    List.concat_map
-      execute_chain
-      (chains requests (fun (account : account) -> account.flags.linked))
+  let request_chains =
+    chains requests (fun (account : account) -> account.flags.linked)
+  in
+  match List.rev request_chains with
+  | open_chain :: complete_chains
+    when open_chain <> [] && (List.hd (List.rev open_chain)).flags.linked ->
+    let complete_results = List.concat_map execute_chain (List.rev complete_chains) in
+    let open_results =
+      List.mapi
+        (fun index _ ->
+           timestamp_cursor := Int64.succ !timestamp_cursor;
+           { timestamp = 0L
+           ; status =
+               (if index = List.length open_chain - 1
+                then Account_linked_event_chain_open
+                else Account_linked_event_failed)
+           })
+        open_chain
+    in
+    complete_results @ open_results
+  | _ -> List.concat_map execute_chain request_chains
 ;;
 
 let create_transfers state ~timestamp (requests : transfer list) =
@@ -758,21 +862,27 @@ let create_transfers state ~timestamp (requests : transfer list) =
               else { timestamp = 0L; status = Transfer_linked_event_failed })
            results)
   in
-  if requests <> [] && (List.hd (List.rev requests)).flags.linked
-  then
-    List.mapi
-      (fun index _ ->
-         { timestamp = 0L
-         ; status =
-             (if index = List.length requests - 1
-              then Transfer_linked_event_chain_open
-              else Transfer_linked_event_failed)
-         })
-      requests
-  else
-    List.concat_map
-      execute_chain
-      (chains requests (fun (transfer : transfer) -> transfer.flags.linked))
+  let request_chains =
+    chains requests (fun (transfer : transfer) -> transfer.flags.linked)
+  in
+  match List.rev request_chains with
+  | open_chain :: complete_chains
+    when open_chain <> [] && (List.hd (List.rev open_chain)).flags.linked ->
+    let complete_results = List.concat_map execute_chain (List.rev complete_chains) in
+    let open_results =
+      List.mapi
+        (fun index _ ->
+           timestamp_cursor := Int64.succ !timestamp_cursor;
+           { timestamp = 0L
+           ; status =
+               (if index = List.length open_chain - 1
+                then Transfer_linked_event_chain_open
+                else Transfer_linked_event_failed)
+           })
+        open_chain
+    in
+    complete_results @ open_results
+  | _ -> List.concat_map execute_chain request_chains
 ;;
 
 let lookup_accounts state ids = List.filter_map (Id_table.find_opt state.accounts) ids
@@ -868,12 +978,33 @@ let get_account_balances state (filter : account_filter) =
   | None -> []
   | Some account ->
     if
-      bounded_timestamp
-        ~minimum:filter.timestamp_min
-        ~maximum:filter.timestamp_max
-        account.timestamp
-    then [ account ]
-    else []
+      (not account.flags.history)
+      || ((not filter.debits) && not filter.credits)
+      || filter.limit <= 0
+      || ((not (Int64.equal filter.timestamp_min 0L))
+          && (not (Int64.equal filter.timestamp_max 0L))
+          && Int64.compare filter.timestamp_min filter.timestamp_max > 0)
+    then []
+    else
+      Option.value (Id_table.find_opt state.account_history filter.account_id) ~default:[]
+      |> List.filter (fun ((snapshot : account), transfer) ->
+        ((filter.debits && U128.equal transfer.debit_account_id filter.account_id)
+         || (filter.credits && U128.equal transfer.credit_account_id filter.account_id))
+        && (is_zero filter.user_data_128
+            || U128.equal transfer.user_data_128 filter.user_data_128)
+        && (Int64.equal filter.user_data_64 0L
+            || Int64.equal transfer.user_data_64 filter.user_data_64)
+        && (Int32.equal filter.user_data_32 0l
+            || Int32.equal transfer.user_data_32 filter.user_data_32)
+        && (filter.code = 0 || transfer.code = filter.code)
+        && bounded_timestamp
+             ~minimum:filter.timestamp_min
+             ~maximum:filter.timestamp_max
+             snapshot.timestamp)
+      |> List.map fst
+      |> sorted_by_timestamp ~reversed:filter.reversed (fun (snapshot : account) ->
+        snapshot.timestamp)
+      |> take filter.limit
 ;;
 
 let expire_pending_transfers state ~timestamp =
@@ -882,11 +1013,7 @@ let expire_pending_transfers state ~timestamp =
     (fun id status ->
        match status, Id_table.find_opt state.transfers id with
        | Pending, Some transfer when Int32.compare transfer.timeout 0l > 0 ->
-         let expires_at =
-           Int64.add
-             transfer.timestamp
-             (Int64.mul (Int64.of_int32 transfer.timeout) 1_000_000_000L)
-         in
+         let expires_at = Int64.add transfer.timestamp (timeout_ns transfer.timeout) in
          if Int64.compare expires_at timestamp <= 0
          then (
            let debit = Id_table.find state.accounts transfer.debit_account_id in
@@ -896,9 +1023,28 @@ let expire_pending_transfers state ~timestamp =
              , U128.sub credit.credits_pending transfer.amount )
            with
            | Ok debits_pending, Ok credits_pending ->
-             Id_table.replace state.accounts debit.id { debit with debits_pending };
-             Id_table.replace state.accounts credit.id { credit with credits_pending };
+             let debit =
+               { debit with
+                 debits_pending
+               ; flags =
+                   (if transfer.flags.closing_debit
+                    then { debit.flags with closed = false }
+                    else debit.flags)
+               }
+             in
+             let credit =
+               { credit with
+                 credits_pending
+               ; flags =
+                   (if transfer.flags.closing_credit
+                    then { credit.flags with closed = false }
+                    else credit.flags)
+               }
+             in
+             Id_table.replace state.accounts debit.id debit;
+             Id_table.replace state.accounts credit.id credit;
              Id_table.replace state.pending id Expired;
+             record_account_history state { transfer with timestamp } debit credit;
              incr expired
            | _ -> failwith "pending-balance invariant violated")
        | _ -> ())

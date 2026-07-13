@@ -179,6 +179,7 @@ type create_transfer_status =
   | Transfer_exceeds_debits
   | Transfer_imported_timestamp_out_of_range
   | Transfer_imported_timestamp_must_not_regress
+  | Transfer_imported_timeout_must_be_zero
 
 (** One result for one create request. Successful requests have their assigned
     timestamp; failed requests normally have timestamp zero. *)
@@ -263,6 +264,6 @@ val query_transfers : t -> query_filter -> transfer list
 (** Returns transfers for an account's requested debit and/or credit side. *)
 val get_account_transfers : t -> account_filter -> transfer list
 
-(** Returns the current account if it satisfies the timestamp bounds. This is
-    not a historical balance query. *)
+(** Returns per-transfer balance snapshots for an account created with [flags.history].
+    Transfer metadata, direction, timestamp, ordering, and limit fields are applied. *)
 val get_account_balances : t -> account_filter -> account list

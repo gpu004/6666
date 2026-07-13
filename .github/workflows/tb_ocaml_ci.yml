@@ -43,7 +43,10 @@ jobs:
       - name: Run Dune runtest
         run: opam exec -- dune runtest
 
+      - name: Build benchmark
+        run: opam exec -- dune build @bench
+
       - name: Check formatting
         run: |
-          find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print0 \
+          find . -name _build -prune -o \( -name '*.ml' -o -name '*.mli' \) -print0 \
             | xargs -0 opam exec -- ocamlformat --check
