@@ -49,7 +49,7 @@
           <tr><td>Deterministic core</td><td><code>ocam/src/state_machine.ml</code></td><td>Implements accounting behavior and maintains the in-memory state.</td></tr>
           <tr><td>Scenario callers</td><td><code>ocam/test/state_machine_test.ml</code></td><td>Covers normal transfers, pending post/void, linked rollback, and validation precedence.</td></tr>
           <tr><td>Property callers</td><td><code>ocam/test/state_machine_property_test.ml</code></td><td>Checks determinism, conservation, idempotency, atomicity, lifecycle, ordering, and U128 boundaries.</td></tr>
-          <tr><td>Benchmark caller</td><td><code>ocam/bench/state_machine_bench.ml</code></td><td>Measures throughput, latency, and allocation for 30,000 prebuilt successful account creations.</td></tr>
+          <tr><td>Benchmark caller</td><td><code>ocam/bench/state_machine_bench.ml</code></td><td>Measures throughput, latency, and allocation for 30,000 prebuilt posted transfers in batches of 30.</td></tr>
           <tr><td>Dune wiring</td><td><code>ocam/src/dune</code>, <code>ocam/test/dune</code>, <code>ocam/bench/dune</code></td><td>Builds the library, tests, and benchmark.</td></tr>
           <tr><td>Behavior oracle</td><td><code>path/to/tigerbeetle/src/state_machine.zig</code></td><td>Upstream LSM/VSR-integrated state machine; not called by the OCaml core.</td></tr>
         </tbody>

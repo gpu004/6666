@@ -119,6 +119,8 @@ type create_account_status =
   | Account_exists
   | Account_linked_event_failed
   | Account_linked_event_chain_open
+  | Account_imported_event_expected
+  | Account_imported_event_not_expected
   | Account_timestamp_must_be_zero
   | Account_id_must_not_be_zero
   | Account_id_must_not_be_int_max
@@ -143,6 +145,8 @@ type create_transfer_status =
   | Transfer_exists
   | Transfer_linked_event_failed
   | Transfer_linked_event_chain_open
+  | Transfer_imported_event_expected
+  | Transfer_imported_event_not_expected
   | Transfer_timestamp_must_be_zero
   | Transfer_id_must_not_be_zero
   | Transfer_id_must_not_be_int_max
@@ -150,10 +154,13 @@ type create_transfer_status =
   | Transfer_exists_with_different_request
   | Transfer_flags_are_mutually_exclusive
   | Transfer_debit_account_id_must_not_be_zero
+  | Transfer_debit_account_id_must_not_be_int_max
   | Transfer_credit_account_id_must_not_be_zero
+  | Transfer_credit_account_id_must_not_be_int_max
   | Transfer_accounts_must_be_different
   | Transfer_pending_id_must_be_zero
   | Transfer_pending_id_must_not_be_zero
+  | Transfer_pending_id_must_not_be_int_max
   | Transfer_pending_id_must_be_different
   | Transfer_timeout_reserved_for_pending_transfer
   | Transfer_closing_transfer_must_be_pending
@@ -266,5 +273,6 @@ val query_transfers : t -> query_filter -> transfer list
 val get_account_transfers : t -> account_filter -> transfer list
 
 (** Returns per-transfer balance snapshots for an account created with [flags.history].
-    Transfer metadata, direction, timestamp, ordering, and limit fields are applied. *)
+    Transfer metadata, direction, timestamp, ordering, and limit fields are applied.
+    Automatic timeout expiry does not add a history snapshot. *)
 val get_account_balances : t -> account_filter -> account list

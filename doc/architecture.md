@@ -71,9 +71,10 @@ state and commits that clone only if every request succeeds. If a request
 fails, that request keeps its actual error while all other requests in the run
 receive `*_linked_event_failed`; no change from the run becomes visible.
 
-A batch whose final request is marked `linked` is an open chain. It is rejected
-without applying any request, reporting `*_linked_event_chain_open` for the
-last entry and `*_linked_event_failed` for the preceding entries.
+A batch whose final request is marked `linked` has an open trailing chain.
+Complete prefix chains remain committed. Earlier requests in the open suffix
+are still validated so the first real failure is preserved, while the final
+entry reports `*_linked_event_chain_open`; the open suffix is rolled back.
 
 ## Reads and filters
 
@@ -87,6 +88,7 @@ returns no results. `get_account_transfers` additionally selects the debit
 and/or credit side. For accounts created with the history flag,
 `get_account_balances` applies the transfer metadata, side, timestamp, ordering,
 and limit filters to per-transfer balance snapshots.
+Automatic timeout expiry removes pending balances without adding a snapshot.
 
 ## Validation and evidence
 

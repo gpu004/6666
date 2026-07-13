@@ -37,7 +37,7 @@ flowchart TD
 | Deterministic core | `ocam/src/state_machine.ml` | Implements all accounting behavior and maintains the in-memory state. |
 | Scenario callers | `ocam/test/state_machine_test.ml` | Covers single-phase transfers, pending post/void, linked rollback, and validation precedence. |
 | Property callers | `ocam/test/state_machine_property_test.ml` | Checks determinism, balance conservation, idempotency, linked atomicity, pending lifecycle, query ordering, and `U128` boundaries. |
-| Benchmark caller | `ocam/bench/state_machine_bench.ml` | Applies 30,000 prebuilt successful account creations and reports throughput, latency, and allocation. |
+| Benchmark caller | `ocam/bench/state_machine_bench.ml` | Applies 30,000 prebuilt posted transfers in batches of 30 and reports throughput, latency, and allocation. |
 | Dune wiring | `ocam/src/dune`, `ocam/test/dune`, `ocam/bench/dune` | Builds the library, tests, and benchmark. |
 | Behavior oracle | `path/to/tigerbeetle/src/state_machine.zig` | The upstream state machine coupled to TigerBeetle’s LSM, VSR, and wire-level components. It is not called by the OCaml core. |
 

@@ -17,7 +17,7 @@ opam exec -- dune build @bench
 
 The benchmark reports operations/second, per-batch latency, total allocated
 words, and allocated words per operation. It uses 30,000 prebuilt successful
-account creations in batches of one so that request construction is outside the
+posted transfers in batches of 30 so that request construction is outside the
 timed path. Run it with `opam exec -- dune exec bench/state_machine_bench.exe`.
 The native TigerBeetle baseline is currently blocked by its standalone fixture's
 commit sequencing, so this directory does not claim a paired performance result.

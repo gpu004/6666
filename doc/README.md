@@ -61,7 +61,7 @@ credits.
 | `lookup_accounts`, `lookup_transfers` | Looks up supplied IDs, keeping request order and omitting unknown IDs. |
 | `query_accounts`, `query_transfers` | Filters by non-zero fields, sorts by timestamp, then applies `limit`. |
 | `get_account_transfers` | Queries transfer history for the debit and/or credit side of one account. |
-| `get_account_balances` | Queries per-transfer balance snapshots for accounts created with the history flag. |
+| `get_account_balances` | Queries per-transfer balance snapshots for history-enabled accounts; timeout expiry does not append a snapshot. |
 
 Each create operation returns one result per input request. A successful result
 contains the assigned timestamp; an unsuccessful result normally has timestamp

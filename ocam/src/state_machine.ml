@@ -114,6 +114,8 @@ type create_account_status =
   | Account_exists
   | Account_linked_event_failed
   | Account_linked_event_chain_open
+  | Account_imported_event_expected
+  | Account_imported_event_not_expected
   | Account_timestamp_must_be_zero
   | Account_id_must_not_be_zero
   | Account_id_must_not_be_int_max
@@ -138,6 +140,8 @@ type create_transfer_status =
   | Transfer_exists
   | Transfer_linked_event_failed
   | Transfer_linked_event_chain_open
+  | Transfer_imported_event_expected
+  | Transfer_imported_event_not_expected
   | Transfer_timestamp_must_be_zero
   | Transfer_id_must_not_be_zero
   | Transfer_id_must_not_be_int_max
@@ -145,10 +149,13 @@ type create_transfer_status =
   | Transfer_exists_with_different_request
   | Transfer_flags_are_mutually_exclusive
   | Transfer_debit_account_id_must_not_be_zero
+  | Transfer_debit_account_id_must_not_be_int_max
   | Transfer_credit_account_id_must_not_be_zero
+  | Transfer_credit_account_id_must_not_be_int_max
   | Transfer_accounts_must_be_different
   | Transfer_pending_id_must_be_zero
   | Transfer_pending_id_must_not_be_zero
+  | Transfer_pending_id_must_not_be_int_max
   | Transfer_pending_id_must_be_different
   | Transfer_timeout_reserved_for_pending_transfer
   | Transfer_closing_transfer_must_be_pending
@@ -258,8 +265,21 @@ let replace_state destination source =
   destination.commit_timestamp <- source.commit_timestamp
 ;;
 
-let account_flags_equal (a : account_flags) (b : account_flags) = a = b
-let transfer_flags_equal (a : transfer_flags) (b : transfer_flags) = a = b
+let stored_account_flags (flags : account_flags) =
+  { flags with linked = false; imported = false }
+;;
+
+let stored_transfer_flags (flags : transfer_flags) =
+  { flags with linked = false; imported = false }
+;;
+
+let account_flags_equal (a : account_flags) (b : account_flags) =
+  stored_account_flags a = stored_account_flags b
+;;
+
+let transfer_flags_equal (a : transfer_flags) (b : transfer_flags) =
+  stored_transfer_flags a = stored_transfer_flags b
+;;
 
 let validate_event_timestamp ~commit_timestamp ~timestamp_event ~imported ~timestamp =
   if imported
@@ -333,13 +353,21 @@ let create_account_one state ~timestamp_event (request : account) =
           | Error `Out_of_range -> error Account_imported_timestamp_out_of_range
           | Error `Regressed -> error Account_imported_timestamp_must_not_regress
           | Ok timestamp ->
-            let account = { request with timestamp } in
+            let account =
+              { request with flags = stored_account_flags request.flags; timestamp }
+            in
             Id_table.add state.accounts account.id account;
             state.commit_timestamp <- timestamp;
             { timestamp; status = Account_created })))
 ;;
 
 let sum_or_error a b = U128.add a b
+
+let total_balance_overflows pending posted =
+  match U128.add pending posted with
+  | Ok _ -> false
+  | Error `Overflow -> true
+;;
 
 let debits_exceed_credits (account : account) amount =
   if not account.flags.debits_must_not_exceed_credits
@@ -496,6 +524,8 @@ let post_or_void state ~timestamp_event (request : transfer) =
   then error Transfer_flags_are_mutually_exclusive
   else if is_zero request.pending_id
   then error Transfer_pending_id_must_not_be_zero
+  else if is_max request.pending_id
+  then error Transfer_pending_id_must_not_be_int_max
   else if U128.equal request.pending_id request.id
   then error Transfer_pending_id_must_be_different
   else if not (Int32.equal request.timeout 0l)
@@ -644,6 +674,7 @@ let post_or_void state ~timestamp_event (request : transfer) =
                                 else request.user_data_32)
                            ; ledger = pending_transfer.ledger
                            ; code = pending_transfer.code
+                           ; flags = stored_transfer_flags request.flags
                            ; timestamp
                            }
                          in
@@ -673,8 +704,12 @@ let create_transfer_one_untracked state ~timestamp_event (request : transfer) =
       then post_or_void state ~timestamp_event request
       else if is_zero request.debit_account_id
       then error Transfer_debit_account_id_must_not_be_zero
+      else if is_max request.debit_account_id
+      then error Transfer_debit_account_id_must_not_be_int_max
       else if is_zero request.credit_account_id
       then error Transfer_credit_account_id_must_not_be_zero
+      else if is_max request.credit_account_id
+      then error Transfer_credit_account_id_must_not_be_int_max
       else if U128.equal request.debit_account_id request.credit_account_id
       then error Transfer_accounts_must_be_different
       else if not (is_zero request.pending_id)
@@ -740,34 +775,56 @@ let create_transfer_one_untracked state ~timestamp_event (request : transfer) =
                      match debit_balance, credit_balance with
                      | Error _, _ | _, Error _ -> error Transfer_overflows_balance
                      | Ok debit_balance, Ok credit_balance ->
-                       let debit =
+                       let debits_pending, debits_posted =
                          if request.flags.pending
-                         then { debit with debits_pending = debit_balance }
-                         else { debit with debits_posted = debit_balance }
+                         then debit_balance, debit.debits_posted
+                         else debit.debits_pending, debit_balance
                        in
-                       let credit =
+                       let credits_pending, credits_posted =
                          if request.flags.pending
-                         then { credit with credits_pending = credit_balance }
-                         else { credit with credits_posted = credit_balance }
+                         then credit_balance, credit.credits_posted
+                         else credit.credits_pending, credit_balance
                        in
-                       let debit =
-                         if request.flags.closing_debit
-                         then { debit with flags = { debit.flags with closed = true } }
-                         else debit
-                       in
-                       let credit =
-                         if request.flags.closing_credit
-                         then { credit with flags = { credit.flags with closed = true } }
-                         else credit
-                       in
-                       Id_table.replace state.accounts debit.id debit;
-                       Id_table.replace state.accounts credit.id credit;
-                       let transfer = { request with amount; timestamp } in
-                       store_transfer state transfer;
-                       if request.flags.pending
-                       then Id_table.add state.pending transfer.id Pending;
-                       record_account_history state transfer debit credit;
-                       { timestamp; status = Transfer_created }))))))
+                       if
+                         total_balance_overflows debits_pending debits_posted
+                         || total_balance_overflows credits_pending credits_posted
+                       then error Transfer_overflows_balance
+                       else (
+                         let debit =
+                           if request.flags.pending
+                           then { debit with debits_pending = debit_balance }
+                           else { debit with debits_posted = debit_balance }
+                         in
+                         let credit =
+                           if request.flags.pending
+                           then { credit with credits_pending = credit_balance }
+                           else { credit with credits_posted = credit_balance }
+                         in
+                         let debit =
+                           if request.flags.closing_debit
+                           then { debit with flags = { debit.flags with closed = true } }
+                           else debit
+                         in
+                         let credit =
+                           if request.flags.closing_credit
+                           then
+                             { credit with flags = { credit.flags with closed = true } }
+                           else credit
+                         in
+                         Id_table.replace state.accounts debit.id debit;
+                         Id_table.replace state.accounts credit.id credit;
+                         let transfer =
+                           { request with
+                             amount
+                           ; flags = stored_transfer_flags request.flags
+                           ; timestamp
+                           }
+                         in
+                         store_transfer state transfer;
+                         if request.flags.pending
+                         then Id_table.add state.pending transfer.id Pending;
+                         record_account_history state transfer debit credit;
+                         { timestamp; status = Transfer_created })))))))
 ;;
 
 let transfer_status_transient = function
@@ -804,32 +861,63 @@ let chains events linked =
 
 let create_accounts state ~timestamp (requests : account list) =
   let timestamp_cursor = ref timestamp in
-  let execute_chain chain =
+  let batch_imported =
+    match requests with
+    | [] -> false
+    | (first : account) :: _ -> first.flags.imported
+  in
+  let execute_one target (request : account) =
+    if request.flags.imported <> batch_imported
+    then
+      { timestamp = 0L
+      ; status =
+          (if request.flags.imported
+           then Account_imported_event_not_expected
+           else Account_imported_event_expected)
+      }
+    else create_account_one target ~timestamp_event:!timestamp_cursor request
+  in
+  let execute_chain ~open_chain chain =
     match chain with
     | [ (request : account) ] when not request.flags.linked ->
-      let result = create_account_one state ~timestamp_event:!timestamp_cursor request in
+      let result = execute_one state request in
       timestamp_cursor := Int64.succ !timestamp_cursor;
       [ result ]
     | _ ->
       let trial = clone state in
-      let results =
-        List.map
-          (fun request ->
-             let result =
-               create_account_one trial ~timestamp_event:!timestamp_cursor request
-             in
-             timestamp_cursor := Int64.succ !timestamp_cursor;
-             result)
-          chain
+      let last_index = List.length chain - 1 in
+      let rec run index failure_index results = function
+        | [] -> List.rev results, failure_index
+        | request :: rest ->
+          let result, failure_index =
+            if open_chain && index = last_index
+            then
+              { timestamp = 0L; status = Account_linked_event_chain_open }, failure_index
+            else (
+              match failure_index with
+              | Some _ ->
+                { timestamp = 0L; status = Account_linked_event_failed }, failure_index
+              | None ->
+                let result = execute_one trial request in
+                let failure_index =
+                  if result.status = Account_created then None else Some index
+                in
+                result, failure_index)
+          in
+          timestamp_cursor := Int64.succ !timestamp_cursor;
+          run (index + 1) failure_index (result :: results) rest
       in
-      (match List.find_opt (fun result -> result.status <> Account_created) results with
-       | None ->
+      let results, failure_index = run 0 None [] chain in
+      (match failure_index, open_chain with
+       | None, false ->
          replace_state state trial;
          results
-       | Some failure ->
-         List.map
-           (fun result ->
-              if result == failure
+       | _ ->
+         List.mapi
+           (fun index result ->
+              if open_chain && index = last_index
+              then { timestamp = 0L; status = Account_linked_event_chain_open }
+              else if Some index = failure_index
               then result
               else { timestamp = 0L; status = Account_linked_event_failed })
            results)
@@ -837,54 +925,84 @@ let create_accounts state ~timestamp (requests : account list) =
   let request_chains =
     chains requests (fun (account : account) -> account.flags.linked)
   in
-  match List.rev request_chains with
-  | open_chain :: complete_chains
-    when open_chain <> [] && (List.hd (List.rev open_chain)).flags.linked ->
-    let complete_results = List.concat_map execute_chain (List.rev complete_chains) in
-    let open_results =
-      List.mapi
-        (fun index _ ->
-           timestamp_cursor := Int64.succ !timestamp_cursor;
-           { timestamp = 0L
-           ; status =
-               (if index = List.length open_chain - 1
-                then Account_linked_event_chain_open
-                else Account_linked_event_failed)
-           })
-        open_chain
-    in
-    complete_results @ open_results
-  | _ -> List.concat_map execute_chain request_chains
+  List.concat_map
+    (fun chain ->
+       let open_chain =
+         match List.rev chain with
+         | (last : account) :: _ -> last.flags.linked
+         | [] -> false
+       in
+       execute_chain ~open_chain chain)
+    request_chains
 ;;
 
 let create_transfers state ~timestamp (requests : transfer list) =
   let timestamp_cursor = ref timestamp in
-  let execute_chain chain =
+  let batch_imported =
+    match requests with
+    | [] -> false
+    | (first : transfer) :: _ -> first.flags.imported
+  in
+  let execute_one target (request : transfer) =
+    if request.flags.imported <> batch_imported
+    then
+      { timestamp = 0L
+      ; status =
+          (if request.flags.imported
+           then Transfer_imported_event_not_expected
+           else Transfer_imported_event_expected)
+      }
+    else create_transfer_one target ~timestamp_event:!timestamp_cursor request
+  in
+  let execute_chain ~open_chain chain =
     match chain with
     | [ (request : transfer) ] when not request.flags.linked ->
-      let result = create_transfer_one state ~timestamp_event:!timestamp_cursor request in
+      let result = execute_one state request in
       timestamp_cursor := Int64.succ !timestamp_cursor;
       [ result ]
     | _ ->
       let trial = clone state in
-      let results =
-        List.map
-          (fun request ->
-             let result =
-               create_transfer_one trial ~timestamp_event:!timestamp_cursor request
-             in
-             timestamp_cursor := Int64.succ !timestamp_cursor;
-             result)
-          chain
+      let last_index = List.length chain - 1 in
+      let rec run index failure_index results = function
+        | [] -> List.rev results, failure_index
+        | request :: rest ->
+          let result, failure_index =
+            if open_chain && index = last_index
+            then
+              { timestamp = 0L; status = Transfer_linked_event_chain_open }, failure_index
+            else (
+              match failure_index with
+              | Some _ ->
+                { timestamp = 0L; status = Transfer_linked_event_failed }, failure_index
+              | None ->
+                let result = execute_one trial request in
+                let failure_index =
+                  if result.status = Transfer_created then None else Some index
+                in
+                result, failure_index)
+          in
+          timestamp_cursor := Int64.succ !timestamp_cursor;
+          run (index + 1) failure_index (result :: results) rest
       in
-      (match List.find_opt (fun result -> result.status <> Transfer_created) results with
-       | None ->
+      let results, failure_index = run 0 None [] chain in
+      (match failure_index, open_chain with
+       | None, false ->
          replace_state state trial;
          results
-       | Some failure ->
-         List.map
-           (fun result ->
-              if result == failure
+       | _ ->
+         Option.iter
+           (fun index ->
+              let result = List.nth results index in
+              if transfer_status_transient result.status
+              then (
+                let request = List.nth chain index in
+                Id_table.replace state.failed_transfers request.id ()))
+           failure_index;
+         List.mapi
+           (fun index result ->
+              if open_chain && index = last_index
+              then { timestamp = 0L; status = Transfer_linked_event_chain_open }
+              else if Some index = failure_index
               then result
               else { timestamp = 0L; status = Transfer_linked_event_failed })
            results)
@@ -892,24 +1010,15 @@ let create_transfers state ~timestamp (requests : transfer list) =
   let request_chains =
     chains requests (fun (transfer : transfer) -> transfer.flags.linked)
   in
-  match List.rev request_chains with
-  | open_chain :: complete_chains
-    when open_chain <> [] && (List.hd (List.rev open_chain)).flags.linked ->
-    let complete_results = List.concat_map execute_chain (List.rev complete_chains) in
-    let open_results =
-      List.mapi
-        (fun index _ ->
-           timestamp_cursor := Int64.succ !timestamp_cursor;
-           { timestamp = 0L
-           ; status =
-               (if index = List.length open_chain - 1
-                then Transfer_linked_event_chain_open
-                else Transfer_linked_event_failed)
-           })
-        open_chain
-    in
-    complete_results @ open_results
-  | _ -> List.concat_map execute_chain request_chains
+  List.concat_map
+    (fun chain ->
+       let open_chain =
+         match List.rev chain with
+         | (last : transfer) :: _ -> last.flags.linked
+         | [] -> false
+       in
+       execute_chain ~open_chain chain)
+    request_chains
 ;;
 
 let lookup_accounts state ids = List.filter_map (Id_table.find_opt state.accounts) ids
@@ -1074,7 +1183,6 @@ let expire_pending_transfers state ~timestamp =
              Id_table.replace state.accounts debit.id debit;
              Id_table.replace state.accounts credit.id credit;
              Id_table.replace state.pending id Expired;
-             record_account_history state { transfer with timestamp } debit credit;
              incr expired
            | _ -> failwith "pending-balance invariant violated")
        | _ -> ())

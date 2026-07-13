@@ -167,6 +167,19 @@ let test_open_linked_suffix () =
   require
     (List.length (lookup_accounts account_state [ u128 1; u128 2; u128 3 ]) = 1)
     "the complete account prefix should remain committed";
+  let failed_open_results =
+    create_accounts
+      account_state
+      ~timestamp:4L
+      [ account ~linked:true 4; account ~linked:true 0; account ~linked:true 5 ]
+  in
+  require
+    (List.map (fun result -> result.status) failed_open_results
+     = [ Account_linked_event_failed
+       ; Account_id_must_not_be_zero
+       ; Account_linked_event_chain_open
+       ])
+    "an open suffix should preserve its first real validation failure";
   let transfer_state = empty () in
   ignore (create_accounts transfer_state ~timestamp:1L [ account 1; account 2 ]);
   let transfer_results =
@@ -186,6 +199,118 @@ let test_open_linked_suffix () =
        ])
     "only the trailing open transfer chain should fail";
   require_u128 10 (account_of transfer_state 1).debits_posted "complete transfer lost"
+;;
+
+let test_batch_compatibility_and_linked_failure_ids () =
+  let max_id_state = empty () in
+  ignore (create_accounts max_id_state ~timestamp:1L [ account 1; account 2 ]);
+  let max_debit = { (transfer 10) with debit_account_id = U128.max_value } in
+  let max_credit = { (transfer 11) with credit_account_id = U128.max_value } in
+  require
+    ((List.hd (create_transfers max_id_state ~timestamp:3L [ max_debit ])).status
+     = Transfer_debit_account_id_must_not_be_int_max)
+    "maximum debit account id should be reserved";
+  require
+    ((List.hd (create_transfers max_id_state ~timestamp:4L [ max_credit ])).status
+     = Transfer_credit_account_id_must_not_be_int_max)
+    "maximum credit account id should be reserved";
+  let overflow_state = empty () in
+  ignore (create_accounts overflow_state ~timestamp:1L [ account 1; account 2 ]);
+  ignore
+    (create_transfers
+       overflow_state
+       ~timestamp:3L
+       [ { (transfer 10) with amount = U128.max_value } ]);
+  let aggregate_overflow =
+    List.hd
+      (create_transfers
+         overflow_state
+         ~timestamp:4L
+         [ transfer ~flags:(transfer_flags ~pending:true ()) ~amount:1 11 ])
+  in
+  require
+    (aggregate_overflow.status = Transfer_overflows_balance)
+    "pending plus posted aggregate should not overflow";
+  let imported_account =
+    let request = account 2 in
+    { request with flags = { request.flags with imported = true }; timestamp = 2L }
+  in
+  let mixed_accounts = empty () in
+  let account_results =
+    create_accounts mixed_accounts ~timestamp:1L [ account 1; imported_account ]
+  in
+  require
+    (List.map (fun result -> result.status) account_results
+     = [ Account_created; Account_imported_event_not_expected ])
+    "account batch should use the first event's imported mode";
+  let imported_transfer =
+    { (transfer ~flags:(transfer_flags ~imported:true ()) ~timestamp:4L 21) with
+      debit_account_id = u128 1
+    ; credit_account_id = u128 2
+    }
+  in
+  ignore (create_accounts mixed_accounts ~timestamp:3L [ account 2 ]);
+  let transfer_results =
+    create_transfers mixed_accounts ~timestamp:5L [ transfer 20; imported_transfer ]
+  in
+  require
+    (List.map (fun result -> result.status) transfer_results
+     = [ Transfer_created; Transfer_imported_event_not_expected ])
+    "transfer batch should use the first event's imported mode";
+  let imported_storage = empty () in
+  let imported_request =
+    let request = account 1 in
+    { request with flags = { request.flags with imported = true }; timestamp = 1L }
+  in
+  ignore (create_accounts imported_storage ~timestamp:2L [ imported_request ]);
+  require
+    (not (account_of imported_storage 1).flags.imported)
+    "event-only imported flag should not be stored";
+  require
+    ((List.hd (create_accounts imported_storage ~timestamp:3L [ imported_request ]))
+       .status
+     = Account_exists)
+    "retry should ignore event-only account flags";
+  let linked_state = empty () in
+  ignore (create_accounts linked_state ~timestamp:1L [ account 1; account 2 ]);
+  let first = transfer ~flags:(transfer_flags ~linked:true ()) 30 in
+  let failing =
+    { (transfer ~flags:(transfer_flags ~linked:true ()) 31) with
+      debit_account_id = u128 3
+    }
+  in
+  let unexecuted = transfer 32 in
+  let linked_results =
+    create_transfers linked_state ~timestamp:3L [ first; failing; unexecuted ]
+  in
+  require
+    (List.map (fun result -> result.status) linked_results
+     = [ Transfer_linked_event_failed
+       ; Transfer_debit_account_not_found
+       ; Transfer_linked_event_failed
+       ])
+    "linked execution should stop after the first real failure";
+  ignore (create_accounts linked_state ~timestamp:6L [ account 3 ]);
+  require
+    ((List.hd
+        (create_transfers
+           linked_state
+           ~timestamp:7L
+           [ { failing with flags = transfer_flags () } ]))
+       .status
+     = Transfer_id_already_failed)
+    "transient failure id should survive linked rollback";
+  require
+    ((List.hd (create_transfers linked_state ~timestamp:8L [ unexecuted ])).status
+     = Transfer_created)
+    "unexecuted linked suffix id should remain reusable";
+  let stored_linked = transfer ~flags:(transfer_flags ~linked:true ()) 40 in
+  ignore (create_transfers linked_state ~timestamp:9L [ stored_linked; transfer 41 ]);
+  require
+    (match lookup_transfers linked_state [ u128 40 ] with
+     | [ stored ] -> not stored.flags.linked
+     | _ -> false)
+    "event-only linked flag should not be stored"
 ;;
 
 let test_timeout_validation_and_closing_expiry () =
@@ -243,6 +368,26 @@ let test_timeout_validation_and_closing_expiry () =
   require
     (not (account_of closing_state 1).flags.closed)
     "expired closing pending transfer should reopen";
+  let expiry_history_filter =
+    { account_id = u128 1
+    ; user_data_128 = U128.zero
+    ; user_data_64 = 0L
+    ; user_data_32 = 0l
+    ; code = 0
+    ; timestamp_min = 0L
+    ; timestamp_max = 0L
+    ; limit = 10
+    ; debits = true
+    ; credits = true
+    ; reversed = false
+    }
+  in
+  require
+    (List.map
+       (fun (snapshot : account) -> snapshot.timestamp)
+       (get_account_balances closing_state expiry_history_filter)
+     = [ 3L ])
+    "automatic expiry should not append a balance-history snapshot";
   let unsigned_state = empty () in
   ignore (create_accounts unsigned_state ~timestamp:1L [ account 1; account 2 ]);
   let high_bit_timeout = Int32.min_int in
@@ -324,6 +469,7 @@ let () =
   test_linked_rollback ();
   test_zig_validation_precedence ();
   test_open_linked_suffix ();
+  test_batch_compatibility_and_linked_failure_ids ();
   test_timeout_validation_and_closing_expiry ();
   test_post_pending_retry_and_balance_history ();
   print_endline "state_machine equivalence scenarios: ok"

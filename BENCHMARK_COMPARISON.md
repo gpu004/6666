@@ -1,8 +1,9 @@
 # State-machine benchmark status
 
-The intended comparison uses 30,000 valid account creations with unique
-identifiers, in prebuilt batches of one. Request construction is outside the
-timed interval.
+The OCaml workload creates two accounts before timing, then applies 30,000
+successful posted transfers in prebuilt batches of 30. Request construction is
+outside the timed interval. A future valid native runner should use the same
+transfer workload.
 
 Only the OCaml runner is currently executable:
 
@@ -19,8 +20,8 @@ not modified by this work.
 
 | Implementation | Timed path | Metrics |
 | --- | --- | --- |
-| TigerBeetle Zig | Planned: the pinned `StateMachine` `create_accounts` commit path through TigerBeetle's in-memory test storage. | Blocked pending a fixture that follows the required commit sequencing. |
-| OCaml | `create_accounts` in the deterministic in-memory rewrite, including creation-result allocation. | Operations/second, mean batch latency, and OCaml heap words allocated. |
+| TigerBeetle Zig | Planned: the pinned `StateMachine` `create_transfers` commit path through TigerBeetle's in-memory test storage. | Blocked pending a fixture that follows the required commit sequencing. |
+| OCaml | `create_transfers` in the deterministic in-memory rewrite, including result allocation. | Operations/second, mean batch latency, and OCaml heap words allocated. |
 
 The OCaml figure tracks the deterministic in-memory core, not server
 throughput. A future native figure will include an LSM/VSR test fixture, so a
@@ -37,4 +38,4 @@ modes.
 | Implementation | Operations/s | Mean batch latency (ms) | Allocation |
 | --- | ---: | ---: | --- |
 | TigerBeetle Zig | blocked | blocked | The standalone fixture needs TigerBeetle's internal commit sequencing completed before it can produce a valid run. |
-| OCaml | 2,236,127 | 0.000447 | 2,586,997 words total; 86.23 words/op |
+| OCaml | 1,216,457 | 0.025 | 6,306,851 words total; 210.23 words/op |
