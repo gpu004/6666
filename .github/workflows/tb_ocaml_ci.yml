@@ -35,13 +35,13 @@ jobs:
           opam install -y ocamlformat.0.28.1
 
       - name: Build
-        run: dune build
+        run: opam exec -- dune build
 
       - name: Build docs
-        run: dune build @doc
+        run: opam exec -- dune build @doc
 
       - name: Run Dune runtest
-        run: dune runtest
+        run: opam exec -- dune runtest
 
       - name: Check formatting
         run: |

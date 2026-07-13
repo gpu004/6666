@@ -38,7 +38,7 @@ jobs:
         run: |
           rm -rf _coverage
           mkdir -p _coverage
-          BISECT_SILENT=YES dune runtest --instrument-with bisect_ppx --force
+          BISECT_SILENT=YES opam exec -- dune runtest --instrument-with bisect_ppx --force
 
       - name: Generate coverage summary
         run: opam exec -- bisect-ppx-report summary
