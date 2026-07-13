@@ -6,7 +6,7 @@ const TestContext = @import("path/to/tigerbeetle/src/state_machine_tests.zig").T
 const tb = @import("path/to/tigerbeetle/src/tigerbeetle.zig");
 const test_options = @import("test_options");
 
-const batch_size = 29;
+const batch_size = 30;
 const operations = if (test_options.benchmark) 30_000 else batch_size;
 
 fn submit(

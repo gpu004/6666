@@ -38,13 +38,14 @@ jobs:
         run: |
           rm -rf _coverage
           mkdir -p _coverage
-          BISECT_SILENT=YES opam exec -- dune runtest --instrument-with bisect_ppx --force
+          BISECT_SILENT=YES BISECT_FILE="$PWD/_coverage/bisect" \
+            opam exec -- dune runtest --instrument-with bisect_ppx --force
 
       - name: Generate coverage summary
-        run: opam exec -- bisect-ppx-report summary
+        run: opam exec -- bisect-ppx-report summary --coverage-path _coverage
 
       - name: Generate HTML report
-        run: opam exec -- bisect-ppx-report html
+        run: opam exec -- bisect-ppx-report html --coverage-path _coverage
 
       - name: Upload HTML report
         uses: actions/upload-artifact@v4

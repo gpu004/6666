@@ -61,22 +61,20 @@ let () =
   let state = empty () in
   ignore (create_accounts state ~timestamp:1L [ account 1; account 2 ]);
   let batches =
-    Array.init
-      (operations / batch_size)
-      (fun batch ->
-        let first_id = (batch * batch_size) + 10 in
-        List.init batch_size (fun offset -> transfer (first_id + offset)))
+    Array.init (operations / batch_size) (fun batch ->
+      let first_id = (batch * batch_size) + 10 in
+      List.init batch_size (fun offset -> transfer (first_id + offset)))
   in
   Gc.full_major ();
   let gc_before = Gc.quick_stat () in
   let started = Unix.gettimeofday () in
   Array.iteri
     (fun batch requests ->
-    ignore
-      (create_transfers
-         state
-         ~timestamp:(Int64.of_int ((batch * batch_size) + 3))
-         requests))
+       ignore
+         (create_transfers
+            state
+            ~timestamp:(Int64.of_int ((batch * batch_size) + 3))
+            requests))
     batches;
   let elapsed = Unix.gettimeofday () -. started in
   let gc_after = Gc.quick_stat () in

@@ -17,11 +17,12 @@ opam exec -- dune build @bench
 
 The benchmark reports operations/second, per-batch latency, total allocated
 words, and allocated words per operation. It uses 30,000 prebuilt successful
-transfers in batches of 30 so that request construction is outside the timed
-path. Run `sh bench/run_state_machine_comparison.sh` from this directory to
-also measure the pinned Zig state machine; see
-[`../BENCHMARK_COMPARISON.md`](../BENCHMARK_COMPARISON.md) for the scope and
-comparison rules.
+account creations in batches of one so that request construction is outside the
+timed path. Run it with `opam exec -- dune exec bench/state_machine_bench.exe`.
+The native TigerBeetle baseline is currently blocked by its standalone fixture's
+commit sequencing, so this directory does not claim a paired performance result.
+See [`../BENCHMARK_COMPARISON.md`](../BENCHMARK_COMPARISON.md) for the exact
+scope and current status.
 
 ## Boundary and current coverage
 
@@ -36,5 +37,5 @@ linked rollback. The Dune suite also runs deterministic QCheck properties for
 execution, conservation, idempotency, linked atomicity, pending resolution,
 lookup/query ordering, and public U128 boundaries. Full differential
 equivalence still requires the entire Zig test corpus, exact numeric result-code
-encoding, CDC/history objects, imported edge cases, query validation, expiry
+encoding, CDC objects, additional imported edge cases, query validation, expiry
 batching, and deprecated operations.
