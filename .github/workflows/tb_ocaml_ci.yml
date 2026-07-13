@@ -24,15 +24,18 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Set up OCaml
+      - name: Set up OxCaml
         uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: 5.4.0
+          ocaml-compiler: oxcaml-compiler.5.2.0minus31
+          opam-repositories: |
+            ox: git+https://github.com/oxcaml/opam-repository.git
+            default: git+https://github.com/ocaml/opam-repository.git
 
       - name: Install dependencies
         run: |
           opam install . --deps-only --with-test --with-doc
-          opam install -y ocamlformat.0.28.1
+          opam install -y ocamlformat.0.26.2+ox1
 
       - name: Build
         run: opam exec -- dune build
