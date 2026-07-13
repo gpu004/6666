@@ -6,14 +6,15 @@ const TestContext = @import("path/to/tigerbeetle/src/state_machine_tests.zig").T
 const tb = @import("path/to/tigerbeetle/src/tigerbeetle.zig");
 const test_options = @import("test_options");
 
-const batch_size = 30;
+const batch_size = 29;
 const operations = if (test_options.benchmark) 30_000 else batch_size;
 
 fn submit(
     context: *TestContext,
     operation: TestContext.StateMachine.Operation,
-    events: anytype,
-    input_buffer: *align(constants.cache_line_size) [constants.message_body_size_max]u8,
+    comptime Event: type,
+    events: []const Event,
+    input_buffer: []align(constants.cache_line_size) u8,
     output_buffer: *align(constants.cache_line_size) [constants.message_body_size_max]u8,
 ) void {
     const event_bytes = std.mem.sliceAsBytes(events);
@@ -47,7 +48,14 @@ test "benchmark: state machine comparison" {
         account.ledger = 1;
         account.code = 1;
     }
-    submit(&context, .create_accounts, accounts[0..], &input_buffer, &output_buffer);
+    submit(
+        &context,
+        .create_accounts,
+        tb.Account,
+        accounts[0..],
+        input_buffer[0..],
+        &output_buffer,
+    );
 
     const transfers = try std.testing.allocator.alloc(tb.Transfer, operations);
     defer std.testing.allocator.free(transfers);
@@ -67,8 +75,9 @@ test "benchmark: state machine comparison" {
         submit(
             &context,
             .create_transfers,
+            tb.Transfer,
             transfers[first .. first + batch_size],
-            &input_buffer,
+            input_buffer[0..],
             &output_buffer,
         );
     }
