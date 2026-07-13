@@ -138,6 +138,7 @@ type create_account_status =
   | Account_ledger_must_not_be_zero
   | Account_code_must_not_be_zero
   | Account_imported_timestamp_out_of_range
+  | Account_imported_timestamp_must_not_advance
   | Account_imported_timestamp_must_not_regress
 
 type create_transfer_status =
@@ -186,6 +187,7 @@ type create_transfer_status =
   | Transfer_exceeds_credits
   | Transfer_exceeds_debits
   | Transfer_imported_timestamp_out_of_range
+  | Transfer_imported_timestamp_must_not_advance
   | Transfer_imported_timestamp_must_not_regress
   | Transfer_imported_timeout_must_be_zero
 

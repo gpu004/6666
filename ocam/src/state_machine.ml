@@ -133,6 +133,7 @@ type create_account_status =
   | Account_ledger_must_not_be_zero
   | Account_code_must_not_be_zero
   | Account_imported_timestamp_out_of_range
+  | Account_imported_timestamp_must_not_advance
   | Account_imported_timestamp_must_not_regress
 
 type create_transfer_status =
@@ -181,6 +182,7 @@ type create_transfer_status =
   | Transfer_exceeds_credits
   | Transfer_exceeds_debits
   | Transfer_imported_timestamp_out_of_range
+  | Transfer_imported_timestamp_must_not_advance
   | Transfer_imported_timestamp_must_not_regress
   | Transfer_imported_timeout_must_be_zero
 
@@ -265,21 +267,8 @@ let replace_state destination source =
   destination.commit_timestamp <- source.commit_timestamp
 ;;
 
-let stored_account_flags (flags : account_flags) =
-  { flags with linked = false; imported = false }
-;;
-
-let stored_transfer_flags (flags : transfer_flags) =
-  { flags with linked = false; imported = false }
-;;
-
-let account_flags_equal (a : account_flags) (b : account_flags) =
-  stored_account_flags a = stored_account_flags b
-;;
-
-let transfer_flags_equal (a : transfer_flags) (b : transfer_flags) =
-  stored_transfer_flags a = stored_transfer_flags b
-;;
+let account_flags_equal (a : account_flags) (b : account_flags) = a = b
+let transfer_flags_equal (a : transfer_flags) (b : transfer_flags) = a = b
 
 let validate_event_timestamp ~commit_timestamp ~timestamp_event ~imported ~timestamp =
   if imported
@@ -353,9 +342,7 @@ let create_account_one state ~timestamp_event (request : account) =
           | Error `Out_of_range -> error Account_imported_timestamp_out_of_range
           | Error `Regressed -> error Account_imported_timestamp_must_not_regress
           | Ok timestamp ->
-            let account =
-              { request with flags = stored_account_flags request.flags; timestamp }
-            in
+            let account = { request with timestamp } in
             Id_table.add state.accounts account.id account;
             state.commit_timestamp <- timestamp;
             { timestamp; status = Account_created })))
@@ -674,7 +661,6 @@ let post_or_void state ~timestamp_event (request : transfer) =
                                 else request.user_data_32)
                            ; ledger = pending_transfer.ledger
                            ; code = pending_transfer.code
-                           ; flags = stored_transfer_flags request.flags
                            ; timestamp
                            }
                          in
@@ -813,13 +799,7 @@ let create_transfer_one_untracked state ~timestamp_event (request : transfer) =
                          in
                          Id_table.replace state.accounts debit.id debit;
                          Id_table.replace state.accounts credit.id credit;
-                         let transfer =
-                           { request with
-                             amount
-                           ; flags = stored_transfer_flags request.flags
-                           ; timestamp
-                           }
-                         in
+                         let transfer = { request with amount; timestamp } in
                          store_transfer state transfer;
                          if request.flags.pending
                          then Id_table.add state.pending transfer.id Pending;
@@ -875,6 +855,13 @@ let create_accounts state ~timestamp (requests : account list) =
            then Account_imported_event_not_expected
            else Account_imported_event_expected)
       }
+    else if request.flags.imported && Int64.compare request.timestamp 0L <= 0
+    then { timestamp = 0L; status = Account_imported_timestamp_out_of_range }
+    else if
+      request.flags.imported && Int64.compare request.timestamp !timestamp_cursor >= 0
+    then { timestamp = 0L; status = Account_imported_timestamp_must_not_advance }
+    else if (not request.flags.imported) && not (Int64.equal request.timestamp 0L)
+    then { timestamp = 0L; status = Account_timestamp_must_be_zero }
     else create_account_one target ~timestamp_event:!timestamp_cursor request
   in
   let execute_chain ~open_chain chain =
@@ -952,6 +939,13 @@ let create_transfers state ~timestamp (requests : transfer list) =
            then Transfer_imported_event_not_expected
            else Transfer_imported_event_expected)
       }
+    else if request.flags.imported && Int64.compare request.timestamp 0L <= 0
+    then { timestamp = 0L; status = Transfer_imported_timestamp_out_of_range }
+    else if
+      request.flags.imported && Int64.compare request.timestamp !timestamp_cursor >= 0
+    then { timestamp = 0L; status = Transfer_imported_timestamp_must_not_advance }
+    else if (not request.flags.imported) && not (Int64.equal request.timestamp 0L)
+    then { timestamp = 0L; status = Transfer_timestamp_must_be_zero }
     else create_transfer_one target ~timestamp_event:!timestamp_cursor request
   in
   let execute_chain ~open_chain chain =

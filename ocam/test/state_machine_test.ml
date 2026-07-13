@@ -144,6 +144,24 @@ let test_linked_rollback () =
 let test_zig_validation_precedence () =
   (* Mirrors the pinned Zig create_account/create_transfer validation ordering. *)
   let state = empty () in
+  let timestamped_account = { (account 0) with timestamp = 1L } in
+  let result = List.hd (create_accounts state ~timestamp:2L [ timestamped_account ]) in
+  require
+    (result.status = Account_timestamp_must_be_zero)
+    "Zig precedence: account timestamp before id";
+  let timestamped_transfer = { (transfer 0) with timestamp = 1L } in
+  let result = List.hd (create_transfers state ~timestamp:2L [ timestamped_transfer ]) in
+  require
+    (result.status = Transfer_timestamp_must_be_zero)
+    "Zig precedence: transfer timestamp before id";
+  let imported_account =
+    let request = account 9 in
+    { request with flags = { request.flags with imported = true }; timestamp = 3L }
+  in
+  let result = List.hd (create_accounts state ~timestamp:3L [ imported_account ]) in
+  require
+    (result.status = Account_imported_timestamp_must_not_advance)
+    "Zig precedence: imported timestamp must not advance batch time";
   let result = List.hd (create_accounts state ~timestamp:1L [ account 0 ]) in
   require (result.status = Account_id_must_not_be_zero) "Zig precedence: account id zero";
   let result = List.hd (create_transfers state ~timestamp:2L [ transfer 1 ]) in
@@ -264,13 +282,13 @@ let test_batch_compatibility_and_linked_failure_ids () =
   in
   ignore (create_accounts imported_storage ~timestamp:2L [ imported_request ]);
   require
-    (not (account_of imported_storage 1).flags.imported)
-    "event-only imported flag should not be stored";
+    (account_of imported_storage 1).flags.imported
+    "imported account flag should be stored";
   require
     ((List.hd (create_accounts imported_storage ~timestamp:3L [ imported_request ]))
        .status
      = Account_exists)
-    "retry should ignore event-only account flags";
+    "retry with identical account flags should exist";
   let linked_state = empty () in
   ignore (create_accounts linked_state ~timestamp:1L [ account 1; account 2 ]);
   let first = transfer ~flags:(transfer_flags ~linked:true ()) 30 in
@@ -308,9 +326,9 @@ let test_batch_compatibility_and_linked_failure_ids () =
   ignore (create_transfers linked_state ~timestamp:9L [ stored_linked; transfer 41 ]);
   require
     (match lookup_transfers linked_state [ u128 40 ] with
-     | [ stored ] -> not stored.flags.linked
+     | [ stored ] -> stored.flags.linked
      | _ -> false)
-    "event-only linked flag should not be stored"
+    "linked transfer flag should be stored"
 ;;
 
 let test_timeout_validation_and_closing_expiry () =
