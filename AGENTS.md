@@ -25,6 +25,17 @@ These instructions apply to the whole repository.
 - After `jj commit`, `@` is normally the new working change and `@-` is the
   commit just created. Do not try to fix this with Git checkout commands.
 
+### Commit and push workflow
+
+When the user explicitly asks to commit and push:
+
+1. Inspect `jj status`, `jj diff`, `jj log`, and `jj bookmark list`.
+2. Each commit should represent one coherent change; use explicit paths and
+   never include generated artifacts.
+3. Move the actual bookmark to `@-`: `jj bookmark move <bookmark> --to @-`.
+4. Push it: `jj git push --remote origin --bookmark <bookmark>`.
+5. Fetch and verify the remote bookmark matches the expected commit.
+
 ## Working style
 
 - Inspect the README, manifests, code, tests, and real execution path before

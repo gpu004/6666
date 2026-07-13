@@ -1,0 +1,7 @@
+(test
+ (name state_machine_test)
+ (libraries tigerbeetle_state_machine))
+
+(test
+ (name state_machine_property_test)
+ (libraries tigerbeetle_state_machine qcheck))

@@ -4,12 +4,12 @@ on:
   push:
     paths:
       - ".github/workflows/tb_ocaml_ci.yml"
-      - "tb_ocaml/**"
+      - "ocam/**"
       - "README.md"
   pull_request:
     paths:
       - ".github/workflows/tb_ocaml_ci.yml"
-      - "tb_ocaml/**"
+      - "ocam/**"
       - "README.md"
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: tb_ocaml
+        working-directory: ocam
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,15 +35,18 @@ jobs:
           opam install -y ocamlformat.0.28.1
 
       - name: Build
-        run: dune build
+        run: opam exec -- dune build
 
       - name: Build docs
-        run: dune build @doc
+        run: opam exec -- dune build @doc
 
       - name: Run Dune runtest
-        run: dune runtest
+        run: opam exec -- dune runtest
+
+      - name: Build benchmark
+        run: opam exec -- dune build @bench
 
       - name: Check formatting
         run: |
-          find . -path './_build' -prune -o \( -name '*.ml' -o -name '*.mli' \) -print0 \
+          find . -name _build -prune -o \( -name '*.ml' -o -name '*.mli' \) -print0 \
             | xargs -0 opam exec -- ocamlformat --check

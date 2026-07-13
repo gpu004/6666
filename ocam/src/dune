@@ -1,0 +1,7 @@
+(library
+ (name tigerbeetle_state_machine)
+ (public_name tigerbeetle_ocaml.state_machine)
+ (modules state_machine)
+ (instrumentation
+  (backend bisect_ppx))
+ (libraries base))

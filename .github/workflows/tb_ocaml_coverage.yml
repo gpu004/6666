@@ -4,12 +4,12 @@ on:
   push:
     paths:
       - ".github/workflows/tb_ocaml_coverage.yml"
-      - "tb_ocaml/**"
+      - "ocam/**"
       - "README.md"
   pull_request:
     paths:
       - ".github/workflows/tb_ocaml_coverage.yml"
-      - "tb_ocaml/**"
+      - "ocam/**"
       - "README.md"
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: tb_ocaml
+        working-directory: ocam
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,16 +38,17 @@ jobs:
         run: |
           rm -rf _coverage
           mkdir -p _coverage
-          BISECT_SILENT=YES dune runtest --instrument-with bisect_ppx --force
+          BISECT_SILENT=YES BISECT_FILE="$PWD/_coverage/bisect" \
+            opam exec -- dune runtest --instrument-with bisect_ppx --force
 
       - name: Generate coverage summary
-        run: opam exec -- bisect-ppx-report summary
+        run: opam exec -- bisect-ppx-report summary --coverage-path _coverage
 
       - name: Generate HTML report
-        run: opam exec -- bisect-ppx-report html
+        run: opam exec -- bisect-ppx-report html --coverage-path _coverage
 
       - name: Upload HTML report
         uses: actions/upload-artifact@v4
         with:
           name: tb_ocaml-coverage-html
-          path: tb_ocaml/_coverage
+          path: ocam/_coverage

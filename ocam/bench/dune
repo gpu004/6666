@@ -1,0 +1,7 @@
+(executable
+ (name state_machine_bench)
+ (libraries tigerbeetle_state_machine unix))
+
+(rule
+ (alias bench)
+ (action (run ./state_machine_bench.exe)))
