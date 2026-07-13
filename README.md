@@ -12,7 +12,8 @@ reference; do not treat this repository as a replacement TigerBeetle server.
   interface.
 - `ocam/src/` — deterministic ledger core, built with Dune and Base.
 - `ocam/test/` and `ocam/bench/` — equivalence scenarios and a state-machine
-  benchmark.
+  benchmark. See [`BENCHMARK_COMPARISON.md`](BENCHMARK_COMPARISON.md) to run
+  the matching Zig and OCaml state-machine measurements.
 
 The intended toolchain is the Jane Street/OxCaml ecosystem. The current core
 is synchronous and keeps its state and wire/storage representations explicit;
@@ -31,6 +32,12 @@ opam exec -- dune build @bench
 
 The benchmark reports operations per second, per-batch latency, and allocation
 figures.
+
+To run the paired comparison from the repository root:
+
+```sh
+sh ocam/bench/run_state_machine_comparison.sh
+```
 
 ## Documentation
 
