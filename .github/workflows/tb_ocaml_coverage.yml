@@ -4,12 +4,12 @@ on:
   push:
     paths:
       - ".github/workflows/tb_ocaml_coverage.yml"
-      - "tb_ocaml/**"
+      - "ocam/**"
       - "README.md"
   pull_request:
     paths:
       - ".github/workflows/tb_ocaml_coverage.yml"
-      - "tb_ocaml/**"
+      - "ocam/**"
       - "README.md"
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: tb_ocaml
+        working-directory: ocam
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,4 +50,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tb_ocaml-coverage-html
-          path: tb_ocaml/_coverage
+          path: ocam/_coverage
