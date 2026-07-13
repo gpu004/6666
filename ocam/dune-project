@@ -7,4 +7,5 @@
  (synopsis "OCaml ledger state machine for the pinned TigerBeetle source tree")
  (depends
   (ocaml (>= 5.1))
-  base))
+  base
+  (qcheck :with-test)))
