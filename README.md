@@ -1,24 +1,59 @@
 # 6666
 
-An experimental OCaml implementation of the TigerBeetle ledger database. The
-upstream TigerBeetle Zig repository is pinned as a Git submodule at
-`path/to/tigerbeetle` for source and behavior reference.
+An experimental OCaml rewrite of TigerBeetle's ledger state machine. It keeps
+the pinned upstream TigerBeetle source at `path/to/tigerbeetle` as the behavior
+reference; do not treat this repository as a replacement TigerBeetle server.
 
-`ocam/` is a full copy of that pinned revision with only
-`src/state_machine.zig` replaced by `src/state_machine.ml`. See
-[`ocam/OCAML_REWRITE.md`](ocam/OCAML_REWRITE.md) for verification commands,
-benchmarking, the integration boundary, and remaining equivalence work.
+## Layout
 
+- `path/to/tigerbeetle/` — pinned upstream Zig source and behavior oracle.
+- `ocam/` — a copy of that pinned revision (`97c7a8ef385270ebe0e1b75959d3d21d134629df`),
+  with `src/state_machine.zig` replaced by the OCaml state machine and its
+  interface.
+- `ocam/src/` — deterministic ledger core, built with Dune and Base.
+- `ocam/test/` and `ocam/bench/` — equivalence scenarios and a state-machine
+  benchmark.
 
-The experimental version is written in ocam folder, library usage guide
+The intended toolchain is the Jane Street/OxCaml ecosystem. The current core
+is synchronous and keeps its state and wire/storage representations explicit;
+Async belongs at an integration boundary rather than in the ledger logic.
 
-I plan to use the janestreet ocaml ecosystem libs, instead of normal ocaml, oxcaml, core, base, async, magic-trace etc etc
+## Build, test, and benchmark
 
-use the following
-https://github.com/janestreet/async
-https://github.com/janestreet/magic-trace
-https://github.com/janestreet/core
-https://github.com/oxcaml/oxcaml
-https://github.com/oxcaml/odoc
-https://github.com/oxcaml/ocaml-lsp
-https://github.com/oxcaml/ocamlformat
+From `ocam/`:
+
+```sh
+opam install . --deps-only --with-test
+opam exec -- dune build
+opam exec -- dune runtest
+opam exec -- dune build @bench
+```
+
+The benchmark reports operations per second, per-batch latency, and allocation
+figures.
+
+## Documentation
+
+Start with the [ledger-core guide](doc/README.md). It describes the state
+machine's public operations, timestamp and linked-batch semantics, and the
+boundary between this in-memory core and the unchanged upstream components.
+
+The API reference is generated from the OCaml interface with `odoc`:
+
+```sh
+cd ocam
+opam exec -- dune build @doc
+open _build/default/_doc/_html/index.html
+```
+
+The generated HTML is a build artifact and is intentionally not checked in.
+
+## Current boundary
+
+The copied Zig LSM and VSR sources are unchanged. The OCaml state machine does
+not yet link into the copied Zig server: that needs a C-ABI adapter and
+wire-compatible 128-byte codecs. Current tests cover core account and transfer
+operations, linked rollback, lookups, and queries; full TigerBeetle equivalence
+still requires the complete Zig corpus and several protocol and edge-case
+areas. See [`ocam/OCAML_REWRITE.md`](ocam/OCAML_REWRITE.md) for the detailed
+coverage and remaining work.

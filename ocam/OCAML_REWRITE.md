@@ -27,6 +27,9 @@ are still required before the copied Zig server can link to this OCaml module.
 
 Current scenarios cover validation precedence, account creation, single-phase
 and pending transfers, posting, voiding, balance changes, lookups, queries, and
-linked rollback. Full differential equivalence still requires the entire Zig
-test corpus, exact numeric result-code encoding, CDC/history objects, imported
-edge cases, query validation, expiry batching, and deprecated operations.
+linked rollback. The Dune suite also runs deterministic QCheck properties for
+execution, conservation, idempotency, linked atomicity, pending resolution,
+lookup/query ordering, and public U128 boundaries. Full differential
+equivalence still requires the entire Zig test corpus, exact numeric result-code
+encoding, CDC/history objects, imported edge cases, query validation, expiry
+batching, and deprecated operations.
