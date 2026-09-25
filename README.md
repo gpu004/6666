@@ -72,7 +72,10 @@ a comparison result.
 
 CI runs `opam lint`, `dune build @fmt`, the test suite, and a Bisect PPX
 coverage job with a minimum line-coverage threshold
-(`.github/workflows/tb_ocaml_coverage.yml`). CodeRabbit reviews pull requests
+(`.github/workflows/tb_ocaml_coverage.yml`). The coverage job also builds the
+`odoc` API reference; it runs on upstream OCaml 5.2 because `bisect_ppx` and
+`odoc` do not currently build on the OxCaml opam overlay.
+CodeRabbit reviews pull requests
 (`.coderabbit.yaml`). See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the local
 equivalents and the `jj` workflow.
 

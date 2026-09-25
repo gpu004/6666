@@ -24,8 +24,8 @@ jobs:
         with:
           submodules: recursive
 
-      # bisect_ppx does not build against OxCaml's patched ppxlib, so coverage
-      # runs on the matching upstream compiler; the core is Stdlib-only.
+      # bisect_ppx and odoc do not currently build on OxCaml's opam overlay, so
+      # coverage and docs run on the upstream compiler; the core is Stdlib-only.
       - name: Set up OCaml
         uses: ocaml/setup-ocaml@v3
         with:
@@ -33,7 +33,10 @@ jobs:
           dune-cache: true
 
       - name: Install dependencies
-        run: opam install -y qcheck bisect_ppx
+        run: opam install -y qcheck bisect_ppx odoc
+
+      - name: Build docs
+        run: opam exec -- dune build @doc
 
       - name: Run coverage-instrumented tests
         run: |

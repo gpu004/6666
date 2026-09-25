@@ -13,7 +13,7 @@ The OCaml code is built with the OxCaml compiler pinned in
 opam switch create tigerbeetle-oxcaml oxcaml-compiler.5.2.0minus39 \
   --repos ox=git+https://github.com/oxcaml/opam-repository.git,default
 eval "$(opam env --switch tigerbeetle-oxcaml)"
-opam install . --deps-only --with-test --with-doc
+opam install . --deps-only --with-test
 opam install ocamlformat.0.26.2+ox2
 ```
 
@@ -23,17 +23,20 @@ Run the same commands CI runs before opening a pull request, from `ocam/`:
 
 ```sh
 opam exec -- dune build
-opam exec -- dune build @doc
 opam exec -- dune runtest
 opam exec -- dune build @bench
 opam exec -- dune build @fmt     # or `dune fmt` to rewrite in place
 ```
 
+`dune build @doc` needs `odoc`, which (like `bisect_ppx`) does not currently
+build on the OxCaml opam overlay; CI builds docs on upstream OCaml 5.2 in the
+coverage workflow.
+
 The coverage workflow instruments the tests with Bisect PPX and fails when
 line coverage drops below the `MINIMUM_COVERAGE` set in
-`.github/workflows/tb_ocaml_coverage.yml`. Bisect PPX does not build against
-OxCaml's patched `ppxlib`, so that workflow runs on upstream OCaml 5.2 (the core
-is Stdlib-only). Reproduce it locally on a standard switch with:
+`.github/workflows/tb_ocaml_coverage.yml`. That workflow runs on upstream
+OCaml 5.2 (the core is Stdlib-only). Reproduce it locally on a standard switch
+with:
 
 ```sh
 opam install bisect_ppx
