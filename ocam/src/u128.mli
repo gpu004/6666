@@ -1,7 +1,7 @@
 (** An unsigned, fixed-width 128-bit value.
 
-    Used for IDs and monetary amounts. Arithmetic reports overflow or underflow
-    rather than wrapping. *)
+    Used for IDs and monetary amounts. Arithmetic reports overflow or underflow rather
+    than wrapping. *)
 
 type t
 

@@ -1,22 +1,21 @@
 (** Deterministic TigerBeetle ledger core.
 
     The module deliberately has no Async or storage dependency. Replication assigns
-    timestamps and calls these functions in commit order; an adapter can then persist
-    the returned state through the unchanged Zig LSM/VSR implementation.
+    timestamps and calls these functions in commit order; an adapter can then persist the
+    returned state through the unchanged Zig LSM/VSR implementation.
 
-    Commit order is a precondition, not a validated input: every [~timestamp] passed
-    to a mutating operation must exceed [commit_timestamp]. Stored objects are kept
-    in append-only timestamp indexes, and appending out of order raises
-    [Invalid_argument]. *)
+    Commit order is a precondition, not a validated input: every [~timestamp] passed to a
+    mutating operation must exceed [commit_timestamp]. Stored objects are kept in
+    append-only timestamp indexes, and appending out of order raises [Invalid_argument]. *)
 
 module U128 = U128
 
 (** Numeric result codes matching the pinned TigerBeetle enums. *)
 module Result_code = Result_code
 
-(** Account behavior flags. [linked] controls atomic batches; [imported]
-    changes timestamp validation; [closed] is set by a successful closing
-    transfer and prevents later transfers involving the account. *)
+(** Account behavior flags. [linked] controls atomic batches; [imported] changes timestamp
+    validation; [closed] is set by a successful closing transfer and prevents later
+    transfers involving the account. *)
 type account_flags = Types.account_flags =
   { linked : bool
   ; debits_must_not_exceed_credits : bool
@@ -26,9 +25,8 @@ type account_flags = Types.account_flags =
   ; closed : bool
   }
 
-(** Transfer behavior flags. [post_pending_transfer] and
-    [void_pending_transfer] cannot both be selected; each resolves an existing
-    pending transfer. *)
+(** Transfer behavior flags. [post_pending_transfer] and [void_pending_transfer] cannot
+    both be selected; each resolves an existing pending transfer. *)
 type transfer_flags = Types.transfer_flags =
   { linked : bool
   ; pending : bool
@@ -41,8 +39,8 @@ type transfer_flags = Types.transfer_flags =
   ; imported : bool
   }
 
-(** An account request and the stored account representation. Account creation
-    requires zero balance fields; successful transfers update those fields. *)
+(** An account request and the stored account representation. Account creation requires
+    zero balance fields; successful transfers update those fields. *)
 type account = Types.account =
   { id : U128.t
   ; debits_pending : U128.t
@@ -58,8 +56,8 @@ type account = Types.account =
   ; timestamp : int64
   }
 
-(** A transfer request and the stored transfer representation. Non-imported
-    requests must have [timestamp = 0L]; the create operation assigns it. *)
+(** A transfer request and the stored transfer representation. Non-imported requests must
+    have [timestamp = 0L]; the create operation assigns it. *)
 type transfer = Types.transfer =
   { id : U128.t
   ; debit_account_id : U128.t
@@ -160,15 +158,15 @@ type create_transfer_status = Types.create_transfer_status =
   | Transfer_imported_timestamp_must_not_regress
   | Transfer_imported_timeout_must_be_zero
 
-(** One result for one create request. Successful requests have their assigned
-    timestamp; failed requests normally have timestamp zero. *)
+(** One result for one create request. Successful requests have their assigned timestamp;
+    failed requests normally have timestamp zero. *)
 type 'status create_result = 'status Types.create_result =
   { timestamp : int64
   ; status : 'status
   }
 
-(** Filters for account and transfer queries. Zero metadata, ledger, and code
-    fields are wildcards. A zero timestamp bound is unbounded. *)
+(** Filters for account and transfer queries. Zero metadata, ledger, and code fields are
+    wildcards. A zero timestamp bound is unbounded. *)
 type query_filter = Types.query_filter =
   { user_data_128 : U128.t
   ; user_data_64 : int64
@@ -206,10 +204,9 @@ val commit_timestamp : t -> int64
 
 (** Validates and stores account requests in batch order.
 
-    Consecutive linked requests are atomic: their writes are journaled and
-    rolled back if any request in the chain fails, so the cost of a chain is
-    proportional to the chain, not to the ledger. Each result corresponds to one
-    request in [account list]. *)
+    Consecutive linked requests are atomic: their writes are journaled and rolled back if
+    any request in the chain fails, so the cost of a chain is proportional to the chain,
+    not to the ledger. Each result corresponds to one request in [account list]. *)
 val create_accounts
   :  t
   -> timestamp:int64
@@ -218,16 +215,16 @@ val create_accounts
 
 (** Validates and applies transfer requests in batch order.
 
-    Normal transfers update posted balances; pending transfers update pending
-    balances. Consecutive linked requests are atomic. *)
+    Normal transfers update posted balances; pending transfers update pending balances.
+    Consecutive linked requests are atomic. *)
 val create_transfers
   :  t
   -> timestamp:int64
   -> transfer list
   -> create_transfer_status create_result list
 
-(** Expires pending transfers whose timeout has elapsed at [timestamp], returning
-    the number expired. *)
+(** Expires pending transfers whose timeout has elapsed at [timestamp], returning the
+    number expired. *)
 val expire_pending_transfers : t -> timestamp:int64 -> int
 
 (** Returns found accounts in the order of requested IDs, omitting unknown IDs. *)
@@ -236,16 +233,16 @@ val lookup_accounts : t -> U128.t list -> account list
 (** Returns found transfers in the order of requested IDs, omitting unknown IDs. *)
 val lookup_transfers : t -> U128.t list -> transfer list
 
-(** Returns accounts matching [filter] in timestamp order, up to [filter.limit].
-    Reads walk a timestamp index, so cost is proportional to the scanned range
-    rather than to the whole ledger. *)
+(** Returns accounts matching [filter] in timestamp order, up to [filter.limit]. Reads
+    walk a timestamp index, so cost is proportional to the scanned range rather than to
+    the whole ledger. *)
 val query_accounts : t -> query_filter -> account list
 
 (** Returns transfers matching [filter] in timestamp order, up to [filter.limit]. *)
 val query_transfers : t -> query_filter -> transfer list
 
-(** Returns transfers for an account's requested debit and/or credit side, read
-    from a per-account timestamp index. *)
+(** Returns transfers for an account's requested debit and/or credit side, read from a
+    per-account timestamp index. *)
 val get_account_transfers : t -> account_filter -> transfer list
 
 (** Returns per-transfer balance snapshots for an account created with [flags.history].

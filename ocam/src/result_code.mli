@@ -1,10 +1,10 @@
 (** Numeric encoding of create statuses.
 
-    Codes follow the [CreateAccountStatus] and [CreateTransferStatus] enums of the
-    pinned TigerBeetle revision. Some OCaml statuses are coarser than upstream and
-    stand for several upstream codes; those have no single [to_code] value and are
-    listed by [*_codes] instead. Upstream codes with no OCaml counterpart
-    ([deprecated_ok], [reserved_field], [reserved_flag], [deprecated_18],
+    Codes follow the [CreateAccountStatus] and [CreateTransferStatus] enums of the pinned
+    TigerBeetle revision. Some OCaml statuses are coarser than upstream and stand for
+    several upstream codes; those have no single [to_code] value and are listed by
+    [*_codes] instead. Upstream codes with no OCaml counterpart ([deprecated_ok],
+    [reserved_field], [reserved_flag], [deprecated_18],
     [imported_event_timestamp_must_postdate_*]) decode to [None]. *)
 
 open Types
