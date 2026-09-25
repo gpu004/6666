@@ -1,7 +1,8 @@
 # OCaml ledger core
 
 This is the reader's guide for the experimental OCaml rewrite in
-[`ocam/src/state_machine.ml`](../ocam/src/state_machine.ml). It is a
+[`ocam/src/`](../ocam/src/), whose public entry point is
+[`state_machine.ml`](../ocam/src/state_machine.ml). It is a
 deterministic, in-memory implementation of a portion of TigerBeetle's ledger
 state-machine behavior. It is not a TigerBeetle server and it does not yet
 replace the pinned upstream Zig implementation.
@@ -35,8 +36,10 @@ thread. There is deliberately no Async, storage, network, or clock dependency
 in this layer.
 
 Identifiers and amounts are `U128.t`. `U128` exposes construction, comparison,
-addition, and subtraction explicitly so balance arithmetic can report overflow
-or underflow rather than silently wrapping.
+addition, subtraction, multiplication, division, shifts, and decimal/hex
+conversion; the arithmetic returns explicit `Overflow`, `Underflow`, or
+`Division_by_zero` results rather than silently wrapping. `Result_code` maps
+every `create_*_status` to the numeric codes of the pinned TigerBeetle enums.
 
 An account has four monotonic balance fields:
 
@@ -59,7 +62,7 @@ credits.
 | `create_transfers` | Validates and applies normal, pending, post-pending, and void-pending transfers. |
 | `expire_pending_transfers` | Removes balances for timed-out pending transfers and marks them expired. |
 | `lookup_accounts`, `lookup_transfers` | Looks up supplied IDs, keeping request order and omitting unknown IDs. |
-| `query_accounts`, `query_transfers` | Filters by non-zero fields, sorts by timestamp, then applies `limit`. |
+| `query_accounts`, `query_transfers` | Walks the timestamp index within `[timestamp_min, timestamp_max]`, filters by non-zero fields, then applies `limit`. |
 | `get_account_transfers` | Queries transfer history for the debit and/or credit side of one account. |
 | `get_account_balances` | Queries per-transfer balance snapshots for history-enabled accounts; timeout expiry does not append a snapshot. |
 

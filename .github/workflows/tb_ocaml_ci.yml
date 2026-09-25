@@ -27,21 +27,22 @@ jobs:
       - name: Set up OxCaml
         uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: oxcaml-compiler.5.2.0minus31
+          ocaml-compiler: oxcaml-compiler.5.2.0minus39
+          dune-cache: true
           opam-repositories: |
             ox: git+https://github.com/oxcaml/opam-repository.git
             default: git+https://github.com/ocaml/opam-repository.git
 
       - name: Install dependencies
         run: |
-          opam install . --deps-only --with-test --with-doc
-          opam install -y ocamlformat.0.26.2+ox1
+          opam install . --deps-only --with-test
+          opam install -y ocamlformat.0.26.2+ox2
+
+      - name: Lint opam manifest
+        run: opam lint tigerbeetle_ocaml.opam
 
       - name: Build
         run: opam exec -- dune build
-
-      - name: Build docs
-        run: opam exec -- dune build @doc
 
       - name: Run Dune runtest
         run: opam exec -- dune runtest
@@ -50,6 +51,4 @@ jobs:
         run: opam exec -- dune build @bench
 
       - name: Check formatting
-        run: |
-          find . -name _build -prune -o \( -name '*.ml' -o -name '*.mli' \) -print0 \
-            | xargs -0 opam exec -- ocamlformat --check
+        run: opam exec -- dune build @fmt
