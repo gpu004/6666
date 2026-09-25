@@ -11,7 +11,6 @@ depends: [
   "ocaml" {>= "5.2"}
   "oxcaml"
   "qcheck" {with-test}
-  "bisect_ppx" {with-test & >= "2.8.0"}
   "odoc" {with-doc}
 ]
 build: [

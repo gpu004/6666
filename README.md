@@ -35,7 +35,7 @@ rewrite the submodule entry, so it is left in place and referenced by name.
 From `ocam/`:
 
 ```sh
-opam switch create tigerbeetle-oxcaml oxcaml-compiler.5.2.0minus31 \
+opam switch create tigerbeetle-oxcaml oxcaml-compiler.5.2.0minus39 \
   --repos ox=git+https://github.com/oxcaml/opam-repository.git,default
 eval "$(opam env --switch tigerbeetle-oxcaml)"
 opam install . --deps-only --with-test
@@ -51,7 +51,7 @@ the same pinned OxCaml compiler. The formatting check uses the matching
 OxCaml-compatible formatter:
 
 ```sh
-opam install ocamlformat.0.26.2+ox1
+opam install ocamlformat.0.26.2+ox2
 opam exec -- dune build @fmt   # `dune fmt` rewrites files in place
 ```
 

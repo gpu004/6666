@@ -24,18 +24,16 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Set up OxCaml
+      # bisect_ppx does not build against OxCaml's patched ppxlib, so coverage
+      # runs on the matching upstream compiler; the core is Stdlib-only.
+      - name: Set up OCaml
         uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: oxcaml-compiler.5.2.0minus31
+          ocaml-compiler: "5.2"
           dune-cache: true
-          opam-repositories: |
-            ox: git+https://github.com/oxcaml/opam-repository.git
-            default: git+https://github.com/ocaml/opam-repository.git
 
       - name: Install dependencies
-        run: |
-          opam install . --deps-only --with-test
+        run: opam install -y qcheck bisect_ppx
 
       - name: Run coverage-instrumented tests
         run: |

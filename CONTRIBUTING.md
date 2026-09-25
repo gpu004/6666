@@ -10,11 +10,11 @@ The OCaml code is built with the OxCaml compiler pinned in
 `.github/workflows/tb_ocaml_ci.yml`. From `ocam/`:
 
 ```sh
-opam switch create tigerbeetle-oxcaml oxcaml-compiler.5.2.0minus31 \
+opam switch create tigerbeetle-oxcaml oxcaml-compiler.5.2.0minus39 \
   --repos ox=git+https://github.com/oxcaml/opam-repository.git,default
 eval "$(opam env --switch tigerbeetle-oxcaml)"
 opam install . --deps-only --with-test --with-doc
-opam install ocamlformat.0.26.2+ox1
+opam install ocamlformat.0.26.2+ox2
 ```
 
 ## Checks
@@ -31,9 +31,12 @@ opam exec -- dune build @fmt     # or `dune fmt` to rewrite in place
 
 The coverage workflow instruments the tests with Bisect PPX and fails when
 line coverage drops below the `MINIMUM_COVERAGE` set in
-`.github/workflows/tb_ocaml_coverage.yml`. Reproduce it locally with:
+`.github/workflows/tb_ocaml_coverage.yml`. Bisect PPX does not build against
+OxCaml's patched `ppxlib`, so that workflow runs on upstream OCaml 5.2 (the core
+is Stdlib-only). Reproduce it locally on a standard switch with:
 
 ```sh
+opam install bisect_ppx
 BISECT_FILE="$PWD/_coverage/bisect" \
   opam exec -- dune runtest --instrument-with bisect_ppx --force
 opam exec -- bisect-ppx-report summary --coverage-path _coverage

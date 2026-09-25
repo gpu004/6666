@@ -27,7 +27,7 @@ jobs:
       - name: Set up OxCaml
         uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: oxcaml-compiler.5.2.0minus31
+          ocaml-compiler: oxcaml-compiler.5.2.0minus39
           dune-cache: true
           opam-repositories: |
             ox: git+https://github.com/oxcaml/opam-repository.git
@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         run: |
           opam install . --deps-only --with-test --with-doc
-          opam install -y ocamlformat.0.26.2+ox1
+          opam install -y ocamlformat.0.26.2+ox2
 
       - name: Lint opam manifest
         run: opam lint tigerbeetle_ocaml.opam
