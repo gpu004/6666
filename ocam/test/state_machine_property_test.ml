@@ -43,14 +43,14 @@ let account ?(user_data_64 = 0L) id =
 ;;
 
 let transfer
-      ?(debit_account_id = 1)
-      ?(credit_account_id = 2)
-      ?(user_data_64 = 0L)
-      ?(flags = transfer_flags ())
-      ?(pending_id = U128.zero)
-      ?(timeout = 0l)
-      ~amount
-      id
+  ?(debit_account_id = 1)
+  ?(credit_account_id = 2)
+  ?(user_data_64 = 0L)
+  ?(flags = transfer_flags ())
+  ?(pending_id = U128.zero)
+  ?(timeout = 0l)
+  ~amount
+  id
   =
   { id = u128 id
   ; debit_account_id = u128 debit_account_id
@@ -108,32 +108,32 @@ let run_commands state commands =
   ignore (create_accounts state ~timestamp:1L [ account 1; account 2 ]);
   List.iteri
     (fun index command ->
-       let debit_to_credit, amount = command in
-       let debit_account_id, credit_account_id = if debit_to_credit then 1, 2 else 2, 1 in
-       ignore
-         (create_transfers
-            state
-            ~timestamp:(Int64.of_int (index + 3))
-            [ transfer ~debit_account_id ~credit_account_id ~amount (index + 10) ]))
+      let debit_to_credit, amount = command in
+      let debit_account_id, credit_account_id = if debit_to_credit then 1, 2 else 2, 1 in
+      ignore
+        (create_transfers
+           state
+           ~timestamp:(Int64.of_int (index + 3))
+           [ transfer ~debit_account_id ~credit_account_id ~amount (index + 10) ]))
     commands
 ;;
 
 let account_snapshot state =
   List.map
     (fun (account : account) ->
-       ( U128.to_string account.id
-       , U128.to_string account.debits_pending
-       , U128.to_string account.debits_posted
-       , U128.to_string account.credits_pending
-       , U128.to_string account.credits_posted
-       , account.timestamp ))
+      ( U128.to_string account.id
+      , U128.to_string account.debits_pending
+      , U128.to_string account.debits_posted
+      , U128.to_string account.credits_pending
+      , U128.to_string account.credits_posted
+      , account.timestamp ))
     (lookup_accounts state [ u128 1; u128 2 ])
 ;;
 
 let transfer_snapshot state commands =
   List.map
     (fun (transfer : transfer) ->
-       U128.to_string transfer.id, U128.to_string transfer.amount, transfer.timestamp)
+      U128.to_string transfer.id, U128.to_string transfer.amount, transfer.timestamp)
     (lookup_transfers
        state
        (List.init (List.length commands) (fun index -> u128 (index + 10))))
@@ -228,73 +228,73 @@ let pending_post_void_and_expiry =
        (QCheck.int_range 0 1_000)
        (QCheck.int_range 0 1_000))
     (fun (post_amount, void_amount, expire_amount) ->
-       let state = empty () in
-       ignore (create_accounts state ~timestamp:1L [ account 1; account 2 ]);
-       let pending id amount timeout =
-         transfer
-           ~flags:(transfer_flags ~pending:true ())
-           ~timeout:(Int32.of_int timeout)
-           ~amount
-           id
-       in
-       let first =
-         exactly_one (create_transfers state ~timestamp:2L [ pending 10 post_amount 0 ])
-       in
-       let second =
-         exactly_one (create_transfers state ~timestamp:3L [ pending 11 void_amount 0 ])
-       in
-       let third =
-         exactly_one (create_transfers state ~timestamp:4L [ pending 12 expire_amount 1 ])
-       in
-       let post =
-         exactly_one
-           (create_transfers
-              state
-              ~timestamp:5L
-              [ transfer
-                  ~flags:(transfer_flags ~post:true ())
-                  ~pending_id:(u128 10)
-                  ~amount:post_amount
-                  20
-              ])
-       in
-       let void =
-         exactly_one
-           (create_transfers
-              state
-              ~timestamp:6L
-              [ transfer
-                  ~flags:(transfer_flags ~void:true ())
-                  ~pending_id:(u128 11)
-                  ~amount:0
-                  21
-              ])
-       in
-       let expired = expire_pending_transfers state ~timestamp:1_000_000_004L in
-       let post_expired =
-         exactly_one
-           (create_transfers
-              state
-              ~timestamp:1_000_000_005L
-              [ transfer
-                  ~flags:(transfer_flags ~post:true ())
-                  ~pending_id:(u128 12)
-                  ~amount:expire_amount
-                  22
-              ])
-       in
-       status_is Transfer_created first
-       && status_is Transfer_created second
-       && status_is Transfer_created third
-       && status_is Transfer_created post
-       && status_is Transfer_created void
-       && expired = 1
-       && status_is Transfer_pending_transfer_expired post_expired
-       && U128.equal (account_of state 1).debits_pending U128.zero
-       && U128.equal (account_of state 2).credits_pending U128.zero
-       && U128.equal (account_of state 1).debits_posted (u128 post_amount)
-       && U128.equal (account_of state 2).credits_posted (u128 post_amount)
-       && balances_are_conserved state [ 1; 2 ])
+      let state = empty () in
+      ignore (create_accounts state ~timestamp:1L [ account 1; account 2 ]);
+      let pending id amount timeout =
+        transfer
+          ~flags:(transfer_flags ~pending:true ())
+          ~timeout:(Int32.of_int timeout)
+          ~amount
+          id
+      in
+      let first =
+        exactly_one (create_transfers state ~timestamp:2L [ pending 10 post_amount 0 ])
+      in
+      let second =
+        exactly_one (create_transfers state ~timestamp:3L [ pending 11 void_amount 0 ])
+      in
+      let third =
+        exactly_one (create_transfers state ~timestamp:4L [ pending 12 expire_amount 1 ])
+      in
+      let post =
+        exactly_one
+          (create_transfers
+             state
+             ~timestamp:5L
+             [ transfer
+                 ~flags:(transfer_flags ~post:true ())
+                 ~pending_id:(u128 10)
+                 ~amount:post_amount
+                 20
+             ])
+      in
+      let void =
+        exactly_one
+          (create_transfers
+             state
+             ~timestamp:6L
+             [ transfer
+                 ~flags:(transfer_flags ~void:true ())
+                 ~pending_id:(u128 11)
+                 ~amount:0
+                 21
+             ])
+      in
+      let expired = expire_pending_transfers state ~timestamp:1_000_000_004L in
+      let post_expired =
+        exactly_one
+          (create_transfers
+             state
+             ~timestamp:1_000_000_005L
+             [ transfer
+                 ~flags:(transfer_flags ~post:true ())
+                 ~pending_id:(u128 12)
+                 ~amount:expire_amount
+                 22
+             ])
+      in
+      status_is Transfer_created first
+      && status_is Transfer_created second
+      && status_is Transfer_created third
+      && status_is Transfer_created post
+      && status_is Transfer_created void
+      && expired = 1
+      && status_is Transfer_pending_transfer_expired post_expired
+      && U128.equal (account_of state 1).debits_pending U128.zero
+      && U128.equal (account_of state 2).credits_pending U128.zero
+      && U128.equal (account_of state 1).debits_posted (u128 post_amount)
+      && U128.equal (account_of state 2).credits_posted (u128 post_amount)
+      && balances_are_conserved state [ 1; 2 ])
 ;;
 
 let query_input =

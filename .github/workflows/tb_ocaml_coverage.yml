@@ -28,6 +28,7 @@ jobs:
         uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: oxcaml-compiler.5.2.0minus31
+          dune-cache: true
           opam-repositories: |
             ox: git+https://github.com/oxcaml/opam-repository.git
             default: git+https://github.com/ocaml/opam-repository.git
@@ -35,7 +36,6 @@ jobs:
       - name: Install dependencies
         run: |
           opam install . --deps-only --with-test
-          opam install bisect_ppx
 
       - name: Run coverage-instrumented tests
         run: |
@@ -44,8 +44,21 @@ jobs:
           BISECT_SILENT=YES BISECT_FILE="$PWD/_coverage/bisect" \
             opam exec -- dune runtest --instrument-with bisect_ppx --force
 
-      - name: Generate coverage summary
-        run: opam exec -- bisect-ppx-report summary --coverage-path _coverage
+      - name: Enforce coverage threshold
+        env:
+          MINIMUM_COVERAGE: "75"
+        run: |
+          summary="$(opam exec -- bisect-ppx-report summary --coverage-path _coverage)"
+          echo "$summary"
+          percent="$(printf '%s\n' "$summary" | sed -n 's/.*(\([0-9.]*\)%).*/\1/p' | head -n1)"
+          if [ -z "$percent" ]; then
+            echo "could not parse coverage percentage" >&2
+            exit 1
+          fi
+          if awk -v p="$percent" -v m="$MINIMUM_COVERAGE" 'BEGIN { exit !(p + 0 < m + 0) }'; then
+            echo "coverage ${percent}% is below the ${MINIMUM_COVERAGE}% minimum" >&2
+            exit 1
+          fi
 
       - name: Generate HTML report
         run: opam exec -- bisect-ppx-report html --coverage-path _coverage

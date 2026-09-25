@@ -10,16 +10,25 @@ reference; do not treat this repository as a replacement TigerBeetle server.
 - `ocam/` — a copy of that pinned revision (`97c7a8ef385270ebe0e1b75959d3d21d134629df`),
   with `src/state_machine.zig` replaced by the OCaml state machine and its
   interface.
-- `ocam/src/` — deterministic ledger core, built with Dune and Base.
-- `ocam/test/` and `ocam/bench/` — equivalence scenarios and a state-machine
-  benchmark. [`BENCHMARK_COMPARISON.md`](BENCHMARK_COMPARISON.md) records the
-  workload, the latest local OCaml result, and the current native-baseline
-  blocker.
+  The copied Zig LSM/VSR sources, docs, and clients are kept verbatim so the
+  eventual C-ABI adapter can be developed in place; the copied upstream CI
+  workflows are not kept because they do not apply to this project.
+- `ocam/src/` — deterministic ledger core, built with Dune on the OCaml
+  standard library: `U128`, `Types`, `Result_code`, `Ledger`, and the public
+  `State_machine` module.
+- `ocam/test/` and `ocam/bench/` — equivalence scenarios, QCheck properties,
+  and a multi-workload state-machine benchmark.
+  [`BENCHMARK_COMPARISON.md`](BENCHMARK_COMPARISON.md) records the workloads
+  and the current native-baseline blocker.
+- `doc/` — reader's guide and architecture notes for the OCaml core.
 
-The build and CI use the pinned OxCaml compiler, Jane Street Base, and the
-matching OxCaml-compatible formatter. The current core is synchronous and
-keeps its state and wire/storage representations explicit; Async belongs at an
+The build and CI use the pinned OxCaml compiler and the matching
+OxCaml-compatible formatter. The current core is synchronous and keeps its
+state and wire/storage representations explicit; Async belongs at an
 integration boundary rather than in the ledger logic.
+
+The submodule path `path/to/tigerbeetle` is historical; renaming it would
+rewrite the submodule entry, so it is left in place and referenced by name.
 
 ## Build, test, and benchmark
 
@@ -43,12 +52,12 @@ OxCaml-compatible formatter:
 
 ```sh
 opam install ocamlformat.0.26.2+ox1
-find . -name _build -prune -o \( -name '*.ml' -o -name '*.mli' \) -print0 \
-  | xargs -0 opam exec -- ocamlformat --check
+opam exec -- dune build @fmt   # `dune fmt` rewrites files in place
 ```
 
-The OCaml benchmark reports operations per second, per-batch latency, and
-allocation figures. Run it from `ocam/`:
+The OCaml benchmark reports operations per second and allocation per
+operation for posted transfers, two-phase transfers, successful and failing
+linked chains, indexed queries, and pending expiry. Run it from `ocam/`:
 
 ```sh
 opam exec -- dune exec bench/state_machine_bench.exe
@@ -61,11 +70,11 @@ a comparison result.
 
 ## Code analysis
 
-DeepSource is configured in [`.deepsource.toml`](.deepsource.toml) for secret
-scanning. The pinned upstream source and its local Zig copy are excluded because
-they are behavior references rather than maintained rewrite code. After merging
-the configuration to the repository's default branch, activate Code Review in
-the DeepSource repository settings.
+CI runs `opam lint`, `dune build @fmt`, the test suite, and a Bisect PPX
+coverage job with a minimum line-coverage threshold
+(`.github/workflows/tb_ocaml_coverage.yml`). CodeRabbit reviews pull requests
+(`.coderabbit.yaml`). See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the local
+equivalents and the `jj` workflow.
 
 ## Documentation
 
@@ -92,3 +101,10 @@ operations, linked rollback, lookups, and queries; full TigerBeetle equivalence
 still requires the complete Zig corpus and several protocol and edge-case
 areas. See [`ocam/OCAML_REWRITE.md`](ocam/OCAML_REWRITE.md) for the detailed
 coverage and remaining work.
+
+## License
+
+The OCaml code and documentation in this repository are licensed under the
+Apache License 2.0 ([`LICENSE`](LICENSE)), matching the upstream TigerBeetle
+sources copied under `ocam/` (`ocam/LICENSE`) and pinned at
+`path/to/tigerbeetle`.

@@ -1,7 +1,8 @@
-(test
- (name state_machine_test)
- (libraries tigerbeetle_state_machine))
-
-(test
- (name state_machine_property_test)
+(tests
+ (names
+  state_machine_test
+  state_machine_property_test
+  u128_test
+  result_code_test
+  timeline_test)
  (libraries tigerbeetle_state_machine qcheck))
