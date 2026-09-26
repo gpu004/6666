@@ -1,9 +1,20 @@
 # State-machine benchmark status
 
-The OCaml workload creates two accounts before timing, then applies 30,000
-successful posted transfers in prebuilt batches of 30. Request construction is
-outside the timed interval. A future valid native runner should use the same
-transfer workload.
+The OCaml benchmark runs several workloads over 100 accounts, each with
+prebuilt requests in batches of 30 so request construction is outside the
+timed interval:
+
+| Workload | Timed path |
+| --- | --- |
+| `posted_transfers` | 30,000 successful single-phase transfers. |
+| `pending_then_post_or_void` | 30,000 pending transfers, then 30,000 posts/voids resolving them. |
+| `linked_chains` | 30,000 transfers in successful 30-request linked chains, over a pre-populated ledger. |
+| `failing_linked_chains` | 30,000 transfers in linked chains whose last request fails, exercising rollback. |
+| `queries_over_populated_ledger` | Timestamp-bounded `query_*`, `get_account_transfers`, and `get_account_balances` over 30,000 transfers. |
+| `pending_expiry` | Expiring 30,000 timed-out pending transfers. |
+
+A future valid native runner should use the `posted_transfers` workload for
+the paired comparison.
 
 Only the OCaml runner is currently executable:
 
@@ -38,4 +49,4 @@ modes.
 | Implementation | Operations/s | Mean batch latency (ms) | Allocation |
 | --- | ---: | ---: | --- |
 | TigerBeetle Zig | blocked | blocked | The standalone fixture needs TigerBeetle's internal commit sequencing completed before it can produce a valid run. |
-| OCaml | 1,250,115 | 0.024 | 5,767,131 words total; 192.24 words/op |
+| OCaml (`posted_transfers`, before indexing/journal work) | 1,250,115 | 0.024 | 192.24 words/op |

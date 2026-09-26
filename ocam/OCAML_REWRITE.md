@@ -15,10 +15,11 @@ opam exec -- dune runtest
 opam exec -- dune build @bench
 ```
 
-The benchmark reports operations/second, per-batch latency, total allocated
-words, and allocated words per operation. It uses 30,000 prebuilt successful
-posted transfers in batches of 30 so that request construction is outside the
-timed path. Run it with `opam exec -- dune exec bench/state_machine_bench.exe`.
+The benchmark reports operations/second and allocated words per operation for
+several prebuilt workloads (posted transfers, pending/post/void, successful and
+failing linked chains, indexed queries over a populated ledger, and pending
+expiry) in batches of 30, so that request construction is outside the timed
+path. Run it with `opam exec -- dune exec bench/state_machine_bench.exe`.
 The native TigerBeetle baseline is currently blocked by its standalone fixture's
 commit sequencing, so this directory does not claim a paired performance result.
 See [`../BENCHMARK_COMPARISON.md`](../BENCHMARK_COMPARISON.md) for the exact
@@ -35,7 +36,10 @@ Current scenarios cover validation precedence, account creation, single-phase
 and pending transfers, posting, voiding, balance changes, lookups, queries, and
 linked rollback. The Dune suite also runs deterministic QCheck properties for
 execution, conservation, idempotency, linked atomicity, pending resolution,
-lookup/query ordering, and public U128 boundaries. Full differential
-equivalence still requires the entire Zig test corpus, exact numeric result-code
-encoding, CDC objects, additional imported edge cases, query validation, expiry
+lookup/query ordering, and public U128 boundaries; `u128_test` and
+`result_code_test` cover the arithmetic and the numeric status codes. Numeric
+result codes follow the pinned `CreateAccountResult`/`CreateTransferResult`
+enums, except that a few OCaml statuses are coarser than upstream and stand
+for several codes (see `src/result_code.mli`). Full differential equivalence
+still requires the entire Zig test corpus, CDC objects, additional imported edge cases, query validation, expiry
 batching, and deprecated operations.

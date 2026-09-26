@@ -7,11 +7,18 @@ compatible. For the compatibility boundary, see
 
 ## State and determinism
 
-`State_machine.t` holds three in-memory tables keyed by `U128` ID:
+`State_machine.t` is a `Ledger.t`. It holds three in-memory tables keyed by
+`U128` ID:
 
 - accounts;
 - transfers; and
-- pending-transfer status (`Pending`, `Posted`, `Voided`, or `Expired`).
+- pending-transfer status (`Pending`, `Posted`, `Voided`, or `Expired`);
+
+plus derived indexes that reads consult instead of scanning those tables:
+accounts and transfers ordered by timestamp, each account's transfers and
+balance-history snapshots ordered by timestamp, and pending transfers ordered
+by expiry time. Every write goes through `Ledger` so the indexes stay
+consistent with the tables.
 
 The only mutable state is inside `t`. Given the same initial state and the same
 operations in the same order, the core produces the same result records and
@@ -66,10 +73,13 @@ later post or void.
 ## Linked batches
 
 The `linked` flag makes adjacent requests atomic. A run ends at the first
-request whose `linked` flag is false. The core applies a linked run to a cloned
-state and commits that clone only if every request succeeds. If a request
-fails, that request keeps its actual error while all other requests in the run
-receive `*_linked_event_failed`; no change from the run becomes visible.
+request whose `linked` flag is false. The core applies a linked run inside
+`Ledger.transact`, which records an undo entry for every table and index
+write. If every request succeeds the journal is discarded; if any request
+fails the journal is replayed in reverse, so rollback costs are proportional to
+the chain rather than to the whole ledger. The failing request keeps its
+actual error while all other requests in the run receive
+`*_linked_event_failed`; no change from the run becomes visible.
 
 A batch whose final request is marked `linked` has an open trailing chain.
 Complete prefix chains remain committed. Earlier requests in the open suffix

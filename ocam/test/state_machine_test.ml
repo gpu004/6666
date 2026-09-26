@@ -13,14 +13,14 @@ let account_flags ?(linked = false) () =
 ;;
 
 let transfer_flags
-      ?(linked = false)
-      ?(pending = false)
-      ?(post_pending_transfer = false)
-      ?(void_pending_transfer = false)
-      ?(closing_debit = false)
-      ?(closing_credit = false)
-      ?(imported = false)
-      ()
+  ?(linked = false)
+  ?(pending = false)
+  ?(post_pending_transfer = false)
+  ?(void_pending_transfer = false)
+  ?(closing_debit = false)
+  ?(closing_credit = false)
+  ?(imported = false)
+  ()
   =
   { linked
   ; pending
@@ -51,12 +51,12 @@ let account ?(linked = false) id =
 ;;
 
 let transfer
-      ?(flags = transfer_flags ())
-      ?(pending_id = U128.zero)
-      ?(amount = 10)
-      ?(timeout = 0l)
-      ?(timestamp = 0L)
-      id
+  ?(flags = transfer_flags ())
+  ?(pending_id = U128.zero)
+  ?(amount = 10)
+  ?(timeout = 0l)
+  ?(timestamp = 0L)
+  id
   =
   { id = u128 id
   ; debit_account_id = u128 1
@@ -527,6 +527,70 @@ let test_post_pending_retry_and_balance_history () =
     "credit-only filter should exclude debit events"
 ;;
 
+let test_failed_chain_leaves_no_index_entries () =
+  let state = empty () in
+  ignore (create_accounts state ~timestamp:1L [ account 1; account 2 ]);
+  ignore (create_transfers state ~timestamp:3L [ transfer 10 ]);
+  let before_transfers = lookup_transfers state [ u128 10 ] in
+  let pending = transfer ~flags:(transfer_flags ~linked:true ~pending:true ()) 20 in
+  let bad = { (transfer ~flags:(transfer_flags ~linked:true ()) 21) with ledger = 0l } in
+  let results = create_transfers state ~timestamp:5L [ pending; bad; transfer 22 ] in
+  require
+    (List.map (fun result -> result.status) results
+     = [ Transfer_linked_event_failed
+       ; Transfer_ledger_must_not_be_zero
+       ; Transfer_linked_event_failed
+       ])
+    "chain statuses";
+  let query =
+    { user_data_128 = U128.zero
+    ; user_data_64 = 0L
+    ; user_data_32 = 0l
+    ; ledger = 0l
+    ; code = 0
+    ; timestamp_min = 0L
+    ; timestamp_max = 0L
+    ; limit = 100
+    ; reversed = false
+    }
+  in
+  let account_filter =
+    { account_id = u128 1
+    ; user_data_128 = U128.zero
+    ; user_data_64 = 0L
+    ; user_data_32 = 0l
+    ; code = 0
+    ; timestamp_min = 0L
+    ; timestamp_max = 0L
+    ; limit = 100
+    ; debits = true
+    ; credits = true
+    ; reversed = false
+    }
+  in
+  require (query_transfers state query = before_transfers) "timestamp index rolled back";
+  require
+    (get_account_transfers state account_filter = before_transfers)
+    "account index rolled back";
+  require
+    (List.length (get_account_balances state account_filter) = 1)
+    "history index rolled back";
+  require
+    (lookup_transfers state [ u128 20; u128 21; u128 22 ] = [])
+    "no stored transfers";
+  require_u128 0 (account_of state 1).debits_pending "pending balance rolled back";
+  require (commit_timestamp state = 3L) "commit timestamp rolled back";
+  require
+    (expire_pending_transfers state ~timestamp:Int64.max_int = 0)
+    "no expiry entries";
+  let after = create_transfers state ~timestamp:8L [ transfer 30 ] in
+  require ((List.hd after).status = Transfer_created) "state usable after rollback";
+  require
+    (List.map (fun (t : transfer) -> t.timestamp) (query_transfers state query)
+     = [ 3L; 8L ])
+    "index continues after rollback"
+;;
+
 let () =
   test_single_phase ();
   test_pending_post_and_void ();
@@ -536,5 +600,6 @@ let () =
   test_batch_compatibility_and_linked_failure_ids ();
   test_timeout_validation_and_closing_expiry ();
   test_post_pending_retry_and_balance_history ();
+  test_failed_chain_leaves_no_index_entries ();
   print_endline "state_machine equivalence scenarios: ok"
 ;;

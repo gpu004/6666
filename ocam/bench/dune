@@ -4,4 +4,5 @@
 
 (rule
  (alias bench)
- (action (run ./state_machine_bench.exe)))
+ (action
+  (run ./state_machine_bench.exe)))
