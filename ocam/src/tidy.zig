@@ -399,15 +399,6 @@ fn tidy_line(file: SourceFile, line: []const u8, line_index: usize, errors: *Err
         const string_value_length = tidy_line_length(string_value);
         if (string_value_length <= 100) return;
 
-        if (std.mem.endsWith(u8, file.path, "state_machine_tests.zig") and
-            (std.mem.startsWith(u8, string_value, " account A") or
-                std.mem.startsWith(u8, string_value, " transfer T") or
-                std.mem.startsWith(u8, string_value, " transfer   ")))
-        {
-            // Table tests from state_machine.zig. They are intentionally wide.
-            return;
-        }
-
         // vsr.zig's Checkpoint ops diagram.
         if (std.mem.endsWith(u8, file.path, "vsr.zig") and
             std.mem.startsWith(u8, string_value, "OPS: ")) return;

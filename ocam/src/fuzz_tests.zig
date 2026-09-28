@@ -48,7 +48,6 @@ const Fuzzers = .{
     .vsr_superblock_quorums = @import("./vsr/superblock_quorums_fuzz.zig"),
     .vsr_multi_batch = @import("./vsr/multi_batch_fuzz.zig"),
     .signal = @import("./clients/c/tb_client/signal_fuzz.zig"),
-    .state_machine = @import("./state_machine_fuzz.zig"),
     // A fuzzer that intentionally fails, to test fuzzing infrastructure itself
     .canary = {},
     // Quickly run all fuzzers as a smoke test
@@ -127,7 +126,6 @@ fn main_smoke(gpa: std.mem.Allocator) !void {
             .lsm_manifest_log => 2_000,
             .lsm_scan => 100,
             .lsm_tree => 400,
-            .state_machine => 10_000,
             .message_bus => 10,
             .storage => 1_000,
             .vsr_free_set => 10_000,
