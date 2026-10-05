@@ -1,0 +1,89 @@
+SKIP create_accounts: account reserved/padding bits are not representable
+PASS create_accounts: empty
+FAIL linked accounts (7 mismatches)
+  commit 1 create_accounts: [1] expected linked_event_failed@3 got linked_event_failed@0
+  commit 1 create_accounts: [2] expected linked_event_failed@4 got linked_event_failed@0
+  commit 1 create_accounts: [4] expected linked_event_failed@6 got linked_event_failed@0
+FAIL linked accounts #2 (3 mismatches)
+  commit 1 create_accounts: [1] expected linked_event_failed@3 got linked_event_failed@0
+  commit 1 create_accounts: [2] expected linked_event_failed@4 got linked_event_failed@0
+  commit 1 create_accounts: [4] expected linked_event_failed@6 got linked_event_failed@0
+FAIL linked_event_chain_open (2 mismatches)
+  commit 1 create_accounts: [3] expected linked_event_failed@5 got linked_event_failed@0
+  commit 1 create_accounts: [4] expected linked_event_chain_open@6 got linked_event_chain_open@0
+FAIL linked_event_chain_open for an already failed batch (3 mismatches)
+  commit 1 create_accounts: [1] expected linked_event_failed@3 got linked_event_failed@0
+  commit 1 create_accounts: [2] expected exists_with_different_flags@4 got exists_with_different_flags@0
+  commit 1 create_accounts: [3] expected linked_event_chain_open@5 got linked_event_chain_open@0
+FAIL linked_event_chain_open for a batch of 1 (1 mismatches)
+  commit 1 create_accounts: [0] expected linked_event_chain_open@2 got linked_event_chain_open@0
+SKIP create_transfers/lookup_transfers: transfer padding bits are not representable
+SKIP create/lookup 2-phase transfers: transfer status exists_with_different_user_data_128 has no OCaml equivalent
+PASS create/lookup 2-phase transfers (amount=maxInt)
+FAIL create/lookup expired transfers (3 mismatches)
+  commit 7 create_transfers: [1] expected pending_transfer_expired@3000000108 got pending_transfer_expired@0
+  commit 7 create_transfers: [2] expected pending_transfer_expired@3000000109 got pending_transfer_expired@0
+  commit 7 create_transfers: [3] expected pending_transfer_expired@3000000110 got pending_transfer_expired@0
+PASS create_transfers: empty
+FAIL create_transfers/lookup_transfers: failed transfer does not exist (1 mismatches)
+  commit 2 create_transfers: [1] expected ledger_must_not_be_zero@6 got ledger_must_not_be_zero@0
+FAIL create_transfers: failed linked-chains are undone (4 mismatches)
+  commit 2 create_transfers: [0] expected linked_event_failed@5 got linked_event_failed@0
+  commit 2 create_transfers: [1] expected ledger_must_not_be_zero@6 got ledger_must_not_be_zero@0
+  commit 3 create_transfers: [0] expected linked_event_failed@8 got linked_event_failed@0
+FAIL create_transfers: failed linked-chains are undone within a commit (2 mismatches)
+  commit 2 create_transfers: [0] expected linked_event_failed@5 got linked_event_failed@0
+  commit 2 create_transfers: [1] expected ledger_must_not_be_zero@6 got ledger_must_not_be_zero@0
+FAIL create_transfers: balancing_debit | balancing_credit (*_must_not_exceed_*) (8 mismatches)
+  commit 2 create_transfers: [0] expected transfer_must_have_the_same_ledger_as_accounts@6 got transfer_must_have_the_same_ledger_as_accounts@0
+  commit 2 create_transfers: [1] expected transfer_must_have_the_same_ledger_as_accounts@7 got transfer_must_have_the_same_ledger_as_accounts@0
+  commit 2 create_transfers: [10] expected exists_with_different_amount@16 got exists_with_different_flags|exists_with_different_debit_account_id|exists_with_different_credit_account_id|exists_with_different_amount|exists_with_different_pending_id|exists_with_different_timeout|exists_with_different_code|exists_with_different_ledger@0
+FAIL create_transfers: balancing_debit | balancing_credit (*_must_not_exceed_*, exceeds_*) (2 mismatches)
+  commit 2 create_transfers: [0] expected exceeds_credits@7 got exceeds_credits@0
+  commit 2 create_transfers: [2] expected exceeds_debits@9 got exceeds_debits@0
+PASS create_transfers: balancing_debit | balancing_credit (¬*_must_not_exceed_*)
+PASS create_transfers: balancing_debit | balancing_credit (amount=0)
+PASS create_transfers: balancing_debit | balancing_credit (amount=maxInt, balance≈maxInt)
+PASS create_transfers: balancing_debit & balancing_credit
+PASS create_transfers: balancing_debit/balancing_credit + pending
+PASS create_transfers: multiple debits, single credit, balancing debits
+FAIL create_transfers: multiple debits, single credit, balancing debits #2 (6 mismatches)
+  commit 2 create_transfers: [0] expected linked_event_failed@9 got linked_event_failed@0
+  commit 2 create_transfers: [1] expected linked_event_failed@10 got linked_event_failed@0
+  commit 2 create_transfers: [2] expected linked_event_failed@11 got linked_event_failed@0
+FAIL create_transfers: per-transfer balance invariant (4 mismatches)
+  commit 2 create_transfers: [0] expected linked_event_failed@6 got linked_event_failed@0
+  commit 2 create_transfers: [1] expected exceeds_debits@7 got exceeds_debits@0
+  commit 2 create_transfers: [2] expected linked_event_failed@8 got linked_event_failed@0
+FAIL create_transfers: per-transfer balance invariant #2 (4 mismatches)
+  commit 2 create_transfers: [0] expected linked_event_failed@6 got linked_event_failed@0
+  commit 2 create_transfers: [1] expected exceeds_credits@7 got exceeds_credits@0
+  commit 2 create_transfers: [2] expected linked_event_failed@8 got linked_event_failed@0
+FAIL imported events: imported batch (5 mismatches)
+  commit 1 create_accounts: [1] expected imported_event_expected@13 got imported_event_expected@0
+  commit 2 create_accounts: [1] expected imported_event_not_expected@17 got imported_event_not_expected@0
+  commit 3 create_transfers: [0] expected created@10 got imported_event_timestamp_must_not_regress@0
+SKIP imported events: timestamp: transfer status imported_event_timestamp_must_postdate_debit_account has no OCaml equivalent
+FAIL imported events: pending transfers (1 mismatches)
+  commit 2 create_transfers: [1] expected imported_event_timeout_must_be_zero@16 got imported_event_timeout_must_be_zero@0
+FAIL imported events: linked chain (6 mismatches)
+  commit 1 create_accounts: [0] expected linked_event_failed@1 got linked_event_failed@0
+  commit 1 create_accounts: [1] expected linked_event_failed@2 got linked_event_failed@0
+  commit 1 create_accounts: [2] expected imported_event_timestamp_out_of_range@14 got imported_event_timestamp_out_of_range@0
+PASS create_accounts: closed accounts
+FAIL create_transfers: closing accounts (18 mismatches)
+  commit 2 create_transfers: [1] expected closing_transfer_must_be_pending@7 got closing_transfer_must_be_pending@0
+  commit 2 create_transfers: [4] expected debit_account_already_closed@10 got debit_account_already_closed|credit_account_already_closed@0
+  commit 2 create_transfers: [5] expected id_already_failed@11 got id_already_failed@0
+PASS get_account_transfers: single-phase
+PASS get_account_transfers: two-phase
+PASS get_account_transfers: invalid filter
+PASS get_account_balances: single-phase
+PASS get_account_balances: two-phase
+PASS get_account_balances: invalid filter
+PASS query_accounts
+PASS query_transfers
+SKIP get_change_events: get_change_events (CDC) is not implemented
+
+41 scenarios: 18 pass, 18 fail, 5 skip
+create results: 1 status mismatches, 79 timestamp-only mismatches

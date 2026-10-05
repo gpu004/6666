@@ -100,9 +100,10 @@ The generated HTML is a build artifact and is intentionally not checked in.
 The copied Zig LSM and VSR sources are unchanged. The OCaml state machine does
 not yet link into the copied Zig server: that needs a C-ABI adapter and
 wire-compatible 128-byte codecs. Current tests cover core account and transfer
-operations, linked rollback, lookups, and queries; full TigerBeetle equivalence
-still requires the complete Zig corpus and several protocol and edge-case
-areas. See [`ocam/OCAML_REWRITE.md`](ocam/OCAML_REWRITE.md) for the detailed
+operations, linked rollback, lookups, and queries, and `ocam/test/zig_corpus.ml`
+replays the upstream `state_machine_tests.zig` scenarios with a checked-in
+pass/fail/skip report; full TigerBeetle equivalence still requires every
+scenario to pass and several protocol and edge-case areas. See [`ocam/OCAML_REWRITE.md`](ocam/OCAML_REWRITE.md) for the detailed
 coverage and remaining work.
 
 ## License

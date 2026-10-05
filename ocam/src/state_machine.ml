@@ -873,3 +873,5 @@ let expire_pending_transfers state ~timestamp =
   if !expired > 0 then Ledger.set_commit_timestamp state timestamp;
   !expired
 ;;
+
+let unsafe_replace_account_for_testing = Ledger.update_account

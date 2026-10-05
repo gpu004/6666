@@ -40,6 +40,15 @@ lookup/query ordering, and public U128 boundaries; `u128_test` and
 `result_code_test` cover the arithmetic and the numeric status codes. Numeric
 result codes follow the pinned `CreateAccountResult`/`CreateTransferResult`
 enums, except that a few OCaml statuses are coarser than upstream and stand
-for several codes (see `src/result_code.mli`). Full differential equivalence
-still requires the entire Zig test corpus, CDC objects, additional imported edge cases, query validation, expiry
-batching, and deprecated operations.
+for several codes (see `src/result_code.mli`).
+
+`test/zig_corpus.ml` replays every `check(...)` table in the retained
+`src/state_machine_tests.zig` (identical to the pinned upstream copy) against
+the OCaml core, mirroring the Zig harness's expected replies and its
+prepare/pulse clock. Its report is diffed against `test/zig_corpus.expected`,
+so parity progress or regressions show up in `dune runtest`; accept an
+intended change with `dune promote`. Scenarios that use features the OCaml
+core cannot express yet (CDC, reserved/padding bits, statuses without an OCaml
+equivalent) are reported as SKIP. Full differential equivalence still requires
+every scenario to pass, CDC objects, query validation, expiry batching, and
+deprecated operations.
