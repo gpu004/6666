@@ -1,11 +1,12 @@
-(* Replays the table-driven scenarios of the upstream TigerBeetle [state_machine_tests.zig]
-   against the OCaml core and prints one line per scenario: PASS, FAIL (with the first
-   mismatches) or SKIP (uses a feature the OCaml core cannot express yet).
+(* Replays the table-driven scenarios of the upstream TigerBeetle
+   [state_machine_tests.zig] against the OCaml core and prints one line per scenario:
+   PASS, FAIL (with the first mismatches) or SKIP (uses a feature the OCaml core cannot
+   express yet).
 
    The interpreter mirrors [check_version] in the Zig file for the current client version:
    the same table grammar ([testing/table.zig]), the same expected-reply construction and
-   the same prepare/pulse clock, with [batch_max.create_transfers = 30] from the [test_min]
-   config used by Zig unit tests. *)
+   the same prepare/pulse clock, with [batch_max.create_transfers = 30] from the
+   [test_min] config used by Zig unit tests. *)
 
 open Tigerbeetle_state_machine.State_machine
 
