@@ -56,6 +56,12 @@ When the user explicitly asks to commit and push:
 - Report exact checks run and any remaining blockers. Do not claim completion
   from static inspection when the real execution path can be tested.
 
+## Skills
+
+- Agent skills live in `.agents/skills/`; see its README for sources.
+  `/create-verification-skill` and `/maintain-verification-skill` run on
+  request only.
+
 <!-- polylane:start -->
 ## Investigating production with Polylane
 
