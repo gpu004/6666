@@ -249,3 +249,8 @@ val get_account_transfers : t -> account_filter -> transfer list
     Transfer metadata, direction, timestamp, ordering, and limit fields are applied.
     Automatic timeout expiry does not add a history snapshot. *)
 val get_account_balances : t -> account_filter -> account list
+
+(** Overwrites a stored account in place, outside any batch, without validation, history,
+    or index updates. Mirrors the upstream test harness [setup] action; never use it
+    outside tests. *)
+val unsafe_replace_account_for_testing : t -> account -> unit

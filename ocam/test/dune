@@ -5,4 +5,32 @@
   u128_test
   result_code_test
   timeline_test)
+ (modules
+  state_machine_test
+  state_machine_property_test
+  u128_test
+  result_code_test
+  timeline_test)
  (libraries tigerbeetle_state_machine qcheck))
+
+; Replays the table-driven scenarios from the upstream state_machine_tests.zig against the
+; OCaml core. The report is diffed against zig_corpus.expected, so parity progress or
+; regressions show up as a diff; run `dune promote` to accept a new report.
+
+(executable
+ (name zig_corpus)
+ (modules zig_corpus)
+ (libraries tigerbeetle_state_machine))
+
+(rule
+ (with-stdout-to
+  zig_corpus.output
+  (run
+   %{exe:zig_corpus.exe}
+   %{dep:../src/state_machine_tests.zig}
+   %{dep:../src/tigerbeetle.zig})))
+
+(rule
+ (alias runtest)
+ (action
+  (diff zig_corpus.expected zig_corpus.output)))
